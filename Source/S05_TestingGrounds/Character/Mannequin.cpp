@@ -4,6 +4,7 @@
 #include "Camera/CameraComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Components/CapsuleComponent.h"
+#include "Engine/World.h"
 #include "../Weapons/Gun.h"
 
 
@@ -39,8 +40,18 @@ void AMannequin::BeginPlay()
 		return;
 	}
 	Gun = GetWorld()->SpawnActor<AGun>(GunActor);
-	Gun->AttachToComponent(FP_ArmMesh, FAttachmentTransformRules(EAttachmentRule::SnapToTarget,true), FName("GripPoint"));
-	Gun->AnimInstance = FP_ArmMesh->GetAnimInstance();
+	if (ensure(Gun == nullptr)) { return; }
+	if (IsPlayerControlled())
+	{
+		Gun->AttachToComponent(FP_ArmMesh, FAttachmentTransformRules(EAttachmentRule::SnapToTarget, true), FName("GripPoint"));
+	}
+	else
+	{
+		Gun->AttachToComponent(GetMesh(), FAttachmentTransformRules(EAttachmentRule::SnapToTarget, true), FName("GripPoint_0"));
+	}
+
+	Gun->AnimInstance1P = FP_ArmMesh->GetAnimInstance();
+	Gun->AnimInstance3P = GetMesh()->GetAnimInstance();
 
 	if (InputComponent != NULL)
 		InputComponent->BindAction("Fire", IE_Pressed, this, &AMannequin::PullTrigger);
@@ -52,13 +63,20 @@ void AMannequin::Tick(float DeltaTime)
 	Super::Tick(DeltaTime);
 
 }
-
 // Called to bind functionality to input
 void AMannequin::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {
 	Super::SetupPlayerInputComponent(PlayerInputComponent);
 
 }
+
+void AMannequin::UnPossessed()
+{
+	if (ensure(Gun == nullptr)) { return; }
+	Super::UnPossessed();
+	Gun->AttachToComponent(GetMesh(), FAttachmentTransformRules(EAttachmentRule::SnapToTarget, true), FName("GripPoint_0"));
+}
+
 void AMannequin::PullTrigger()
 {
 	Gun->OnFire();
