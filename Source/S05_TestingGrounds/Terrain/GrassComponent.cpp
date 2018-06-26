@@ -34,12 +34,10 @@ void UGrassComponent::SpawnGrass()
 	}
 }
 
-
 // Called every frame
 void UGrassComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 
-	// ...
 }
 

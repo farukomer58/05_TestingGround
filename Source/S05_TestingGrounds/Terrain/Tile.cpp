@@ -3,13 +3,42 @@
 #include "Tile.h"
 #include "Engine/World.h"
 #include "DrawDebugHelpers.h"
-
+#include "Kismet/GameplayStatics.h"
+#include "EngineUtils.h"
+#include "AI/Navigation/NavigationSystem.h"
+#include "../ActorPool.h"
 
 // Sets default values
 ATile::ATile()
 {
  	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = true;
+
+	NavigationBoundsOffset = FVector(2000, 0, 0);
+
+	MinExtent= FVector(0, -2000, 0);
+	MaxExtent= FVector(4000, 2000, 0);
+
+}
+
+void ATile::SetPool(UActorPool* InPool)
+{
+	UE_LOG(LogTemp, Warning, TEXT("[%s] Setting Pool %s"), *(this->GetName()), *(InPool->GetName()));
+	Pool = InPool;
+
+	PositionNavMeshBoundsVolume();
+}
+
+void ATile::PositionNavMeshBoundsVolume()
+{
+	NavMeshBoundsVolume = Pool->Checkout();
+	if (NavMeshBoundsVolume == nullptr)
+	{
+		UE_LOG(LogTemp, Error, TEXT("Not enough actors in pool."));
+		return;
+	}
+	NavMeshBoundsVolume->SetActorLocation(GetActorLocation() + NavigationBoundsOffset);
+	GetWorld()->GetNavigationSystem()->Build();
 }
 
 void ATile::PlaceActors(TSubclassOf<AActor> ActorToSpawn, int32 MinSpawn, int32 MaxSpawn, float Radius, float MinScale, float MaxScale)
@@ -23,11 +52,10 @@ void ATile::PlaceActors(TSubclassOf<AActor> ActorToSpawn, int32 MinSpawn, int32 
 		PlaceActor(ActorToSpawn, SpawnPoint, RandomRotation, RandomScale);
 	}
 }
+
 bool ATile::FindEmptyLocation(FVector& OutLocation, float Radius)
 {
-	FVector Min = FVector(0, -2000, 0);
-	FVector Max = FVector(4000, 2000, 0);
-	FBox Bounds = FBox(Min, Max);
+	FBox Bounds = FBox(MinExtent, MaxExtent);
 	const int MAX_ATTEMPTS = 100;
 
 	for (size_t i = 0; i < MAX_ATTEMPTS; i++)
@@ -41,6 +69,7 @@ bool ATile::FindEmptyLocation(FVector& OutLocation, float Radius)
 	}
 	return false;
 }
+
 void ATile::PlaceActor(TSubclassOf<AActor> ActorToSpawn, FVector SpawnPoint, float Rotation, float Scale)
 {
 	AActor* Prop = GetWorld()->SpawnActor<AActor>(ActorToSpawn);
@@ -55,6 +84,10 @@ void ATile::BeginPlay()
 {
 	Super::BeginPlay();
 
+}
+void ATile::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	Pool->Return(NavMeshBoundsVolume);
 }
 
 // Called every frame
