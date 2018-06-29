@@ -6,6 +6,18 @@
 #include "GameFramework/Actor.h"
 #include "Tile.generated.h"
 
+USTRUCT()
+struct FSpawnPosition
+{
+	GENERATED_USTRUCT_BODY()
+
+	FVector Location;
+	float Rotation;
+	float Scale;
+
+};
+
+
 class UActorPool;
 
 UCLASS()
@@ -21,6 +33,9 @@ public:
 
 	UFUNCTION(BlueprintCallable)
 	void PlaceActors(TSubclassOf<AActor> ActorToSpawn, int32 MinSpawn, int32 MaxSpawn, float Radius = 300.f, float MinScale = 1, float MaxScale = 1);
+
+	UFUNCTION(BlueprintCallable)
+	void PlaceAIPawns(TSubclassOf<APawn> ActorToSpawn, int32 MinSpawn, int32 MaxSpawn, float Radius = 300.f);
 
 	UFUNCTION(BlueprintCallable)
 	void SetPool(UActorPool* InPool);
@@ -43,7 +58,14 @@ private:
 
 	void PositionNavMeshBoundsVolume();
 
-	void PlaceActor(TSubclassOf<AActor> ActorToSpawn, FVector SpawnPoint, float Rotation, float Scale);
+	template<class T>
+	void RandomlyPlaceActors(TSubclassOf<T> ActorToSpawn, int32 MinSpawn, int32 MaxSpawn, float Radius = 300.f, float MinScale = 1, float MaxScale = 1);
+
+	void PlaceActor(TSubclassOf<AActor> ActorToSpawn, const FSpawnPosition& SpawnPosition);
+
+	void PlaceActor(TSubclassOf<APawn> ActorToSpawn, const FSpawnPosition& SpawnPosition);
+
+	TArray<FSpawnPosition> RandomSpawnPositions(int32 MinSpawn, int32 MaxSpawn, float Radius , float MinScale , float MaxScale);
 
 	bool FindEmptyLocation(FVector& OutLocation, float Radius);
 
