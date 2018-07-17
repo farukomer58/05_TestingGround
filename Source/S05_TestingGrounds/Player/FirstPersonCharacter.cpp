@@ -10,7 +10,7 @@
 #include "MotionControllerComponent.h"
 #include "Engine/World.h"
 #include "Components/SkeletalMeshComponent.h"
-#include "../Weapons/Gun.h"
+#include "../Weapons/WeaponBase.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogFPChar, Warning, All);
 
@@ -81,7 +81,7 @@ void AFirstPersonCharacter::BeginPlay()
 
 	if (GunBlueprint == NULL) { UE_LOG(LogTemp, Warning, TEXT("No gun"));  return; }
 	
-	FP_Gun = GetWorld()->SpawnActor<AGun>(GunBlueprint);
+	FP_Gun = GetWorld()->SpawnActor<AWeaponBase>(GunBlueprint);
 	FP_Gun->AttachToComponent(Mesh1P, FAttachmentTransformRules(EAttachmentRule::SnapToTarget, true), TEXT("GripPoint"));
 	FP_Gun->AnimInstance1P = Mesh1P->GetAnimInstance();
 	// Show or hide the two versions of the gun based on whether or not we're using motion controllers.
@@ -97,7 +97,7 @@ void AFirstPersonCharacter::BeginPlay()
 	}
 	if (!InputComponent) { UE_LOG(LogTemp,Warning,TEXT("No Input Component")); return; }
 	// Bind fire event
-	InputComponent->BindAction("Fire", IE_Pressed, FP_Gun, &AGun::OnFire);
+	InputComponent->BindAction("Fire", IE_Pressed, FP_Gun, &AWeaponBase::OnFire);
 }
 
 //////////////////////////////////////////////////////////////////////////

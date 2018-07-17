@@ -5,7 +5,8 @@
 #include "Components/SkeletalMeshComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "Engine/World.h"
-#include "../Weapons/Gun.h"
+#include "Engine.h"
+#include "../Weapons/WeaponBase.h"
 
 
 // Sets default values
@@ -34,27 +35,30 @@ AMannequin::AMannequin()
 void AMannequin::BeginPlay()
 {
 	Super::BeginPlay();
+
 	if (GunActor == NULL)
 	{
 		UE_LOG(LogTemp, Warning, TEXT("NO WEAPON GIVEN TO : %s"), *GetName());
 		return;
 	}
-	Gun = GetWorld()->SpawnActor<AGun>(GunActor);
-	if (ensure(Gun == nullptr)) { return; }
-	if (IsPlayerControlled())
+	Weapon = GetWorld()->SpawnActor<AWeaponBase>(GunActor);
+	if (ensure(Weapon == nullptr)) { return; }
+	if (IsPlayerControlled() && IsFirstPerson)
 	{
-		Gun->AttachToComponent(FP_ArmMesh, FAttachmentTransformRules(EAttachmentRule::SnapToTarget, true), FName("GripPoint"));
+		Weapon->AttachToComponent(FP_ArmMesh, FAttachmentTransformRules(EAttachmentRule::SnapToTarget, true), Weapon->SocketName1P);
 	}
 	else
 	{
-		Gun->AttachToComponent(GetMesh(), FAttachmentTransformRules(EAttachmentRule::SnapToTarget, true), FName("GripPoint_0"));
+		Weapon->AttachToComponent(GetMesh(), FAttachmentTransformRules(EAttachmentRule::SnapToTarget, true), Weapon->SocketName3P);
 	}
 
-	Gun->AnimInstance1P = FP_ArmMesh->GetAnimInstance();
-	Gun->AnimInstance3P = GetMesh()->GetAnimInstance();
+	Weapon->AnimInstance1P = FP_ArmMesh->GetAnimInstance();
+	Weapon->AnimInstance3P = GetMesh()->GetAnimInstance();
 
 	if (InputComponent != NULL)
-		InputComponent->BindAction("Fire", IE_Pressed, this, &AMannequin::PullTrigger);
+		InputComponent->BindAction("Fire", IE_Pressed, this, &AMannequin::TriggerTimer);
+	if (InputComponent != NULL)
+		InputComponent->BindAction("Fire", IE_Released, this, &AMannequin::StopTriggerTimer);
 }
 
 // Called every frame
@@ -67,17 +71,35 @@ void AMannequin::Tick(float DeltaTime)
 void AMannequin::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {
 	Super::SetupPlayerInputComponent(PlayerInputComponent);
-
 }
 
 void AMannequin::UnPossessed()
 {
-	if (ensure(Gun == nullptr)) { return; }
 	Super::UnPossessed();
-	Gun->AttachToComponent(GetMesh(), FAttachmentTransformRules(EAttachmentRule::SnapToTarget, true), FName("GripPoint_0"));
-}
 
+	if (ensure(Weapon == nullptr)) { return; }
+	Weapon->AttachToComponent(GetMesh(), FAttachmentTransformRules(EAttachmentRule::SnapToTarget, true), FName("GripPoint_0"));
+}
 void AMannequin::PullTrigger()
 {
-	Gun->OnFire();
+	Weapon->OnFire();
+	
+}
+void AMannequin::TriggerTimer()
+{
+	if (canHandle)
+	{
+		PullTrigger();
+		StartTriggerTimer();
+		canHandle = false;
+	}
+}
+void AMannequin::StartTriggerTimer()
+{
+	GetWorldTimerManager().SetTimer(UnusedHandle, this, &AMannequin::PullTrigger, 0.01, true);
+}
+void AMannequin::StopTriggerTimer()
+{
+		GetWorldTimerManager().ClearTimer(UnusedHandle);
+		canHandle = true;
 }

@@ -37,7 +37,7 @@ class AFirstPersonCharacter : public ACharacter
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess = "true"))
 	class UMotionControllerComponent* L_MotionController;
 	
-	class AGun* FP_Gun;
+	class AWeaponBase* FP_Gun;
 
 	class UInputComponent* InputComponent;
 
@@ -61,7 +61,7 @@ public:
 	FVector GunOffset;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Projectile")
-	TSubclassOf <class AGun> GunBlueprint;
+	TSubclassOf <class AWeaponBase> GunBlueprint;
 
 	/** Whether to use motion controller location for aiming. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Gameplay)

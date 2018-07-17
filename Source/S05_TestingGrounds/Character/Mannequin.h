@@ -24,22 +24,32 @@ public:
 	virtual void UnPossessed() override;
 
 	UPROPERTY(EditDefaultsOnly)
-	TSubclassOf<class AGun> GunActor;
+	TSubclassOf<class AWeaponBase> GunActor;
 
 	UFUNCTION(BlueprintCallable)
 	void PullTrigger();
 
+	void TriggerTimer();
+	void StopTriggerTimer();
+	void StartTriggerTimer();
+
+
+	UPROPERTY(VisibleAnywhere, meta = (AllowPrivateAccess = "true"))
+	class UCameraComponent* FP_Camera;
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
 
 private:
 
-	UPROPERTY(VisibleAnywhere, meta = (AllowPrivateAccess = "true"))
-	class UCameraComponent* FP_Camera;
+	UPROPERTY(EditDefaultsOnly)
+	bool IsFirstPerson;
+
+	FTimerHandle UnusedHandle;
+	bool canHandle = true;
 
 	UPROPERTY(VisibleAnywhere)
 	class USkeletalMeshComponent* FP_ArmMesh;
 
-	AGun* Gun;
+	AWeaponBase* Weapon;
 };
