@@ -53,11 +53,11 @@ void AMannequin::BeginPlay()
 
 	if (IsPlayerControlled() && IsFirstPerson)
 	{
-		Weapon->AttachToComponent(FP_ArmMesh, FAttachmentTransformRules(EAttachmentRule::SnapToTarget, true), Weapon->SocketName1P);
+		Weapon->AttachToComponent(FP_ArmMesh, FAttachmentTransformRules(EAttachmentRule::SnapToTarget, true), Weapon->WeaponInfo.SocketName1P);
 	}
 	else
 	{
-		Weapon->AttachToComponent(GetMesh(), FAttachmentTransformRules(EAttachmentRule::SnapToTarget, true), Weapon->SocketName3P);
+		Weapon->AttachToComponent(GetMesh(), FAttachmentTransformRules(EAttachmentRule::SnapToTarget, true), Weapon->WeaponInfo.SocketName3P);
 	}
 
 	Weapon->AnimInstance1P = FP_ArmMesh->GetAnimInstance();
@@ -107,7 +107,7 @@ void AMannequin::UnPossessed()
 
 	if (ensure(Weapon == nullptr)) { return; }
 
-	Weapon->AttachToComponent(GetMesh(), FAttachmentTransformRules(EAttachmentRule::SnapToTarget, true), FName("GripPoint_0"));
+	Weapon->AttachToComponent(GetMesh(), FAttachmentTransformRules(EAttachmentRule::SnapToTarget, true), Weapon->WeaponInfo.SocketName3P);
 }
 void AMannequin::PullTrigger()
 {

@@ -42,6 +42,36 @@ public:
 	float FireRate = 0.15f;
 	UPROPERTY(EditDefaultsOnly)
 	EWeaponClass WeaponClass;
+	UPROPERTY(EditDefaultsOnly)
+	float SprayRange = 300.f;
+	UPROPERTY(EditDefaultsOnly)
+	bool IsShotgun;
+	UPROPERTY(EditDefaultsOnly, meta = (EditCondition = "IsShotgun"))
+	float ShotsPerFire;
+	UPROPERTY(EditDefaultsOnly, meta = (EditCondition = "IsShotgun"))
+	float SpreadRadius;
+
+
+	UPROPERTY(EditDefaultsOnly)
+	FName SocketName1P;
+	UPROPERTY(EditDefaultsOnly)
+	FName SocketName3P;
+
+	/** Projectile class to spawn */
+	UPROPERTY(EditDefaultsOnly, Category = Projectile)
+	TSubclassOf<class ABallProjectile> ProjectileClass;
+
+	/** Sound to play each time we fire */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Gameplay)
+	class USoundBase* FireSound;
+
+	/** AnimMontage to play each time we fire */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Gameplay)
+	class UAnimMontage* FireAnimation1P;
+
+	/** AnimMontage to play each time we fire */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Gameplay)
+	class UAnimMontage* FireAnimation3P;
 };
 
 UCLASS()
@@ -69,34 +99,6 @@ public:
 	UFUNCTION(BlueprintCallable)
 	void OnFire();
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Gameplay)
-	float WeaponDamage = 100.f;
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Gameplay)
-	float fireRate = 0.1f;
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Gameplay)
-	EWeaponClass WeaponClass = EWeaponClass::RifleFullAuto;
-
-	UPROPERTY(EditDefaultsOnly)
-	FName SocketName1P;
-	UPROPERTY(EditDefaultsOnly)
-	FName SocketName3P;
-
-	/** Projectile class to spawn */
-	UPROPERTY(EditDefaultsOnly, Category = Projectile)
-	TSubclassOf<class ABallProjectile> ProjectileClass;
-
-	/** Sound to play each time we fire */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Gameplay)
-	class USoundBase* FireSound;
-
-	/** AnimMontage to play each time we fire */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Gameplay)
-	class UAnimMontage* FireAnimation1P;
-
-	/** AnimMontage to play each time we fire */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Gameplay)
-	class UAnimMontage* FireAnimation3P;
-
 	class UAnimInstance* AnimInstance1P;
 	class UAnimInstance* AnimInstance3P;
 
@@ -114,18 +116,7 @@ private:
 
 	class UCameraComponent* GetCamera();
 
-	UPROPERTY(EditDefaultsOnly)
-	float SprayRange = 300.f;
-
-	UPROPERTY(EditDefaultsOnly)
-	float ShotsPerFire;
-	UPROPERTY(EditDefaultsOnly)
-	float SpreadRadius;
-
 	bool CanFire = true;
-
-	UPROPERTY(EditDefaultsOnly)
-	bool IsShotgun;
 
 	bool IsStarted = true;
 

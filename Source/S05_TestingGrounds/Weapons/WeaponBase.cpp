@@ -70,7 +70,7 @@ void AWeaponBase::OnFire()
 	{
 		CanFire = false;
 		FTimerHandle UnUsedHandle;
-		GetWorldTimerManager().SetTimer(UnUsedHandle, this, &AWeaponBase::ResetCanFire, fireRate, false);
+		GetWorldTimerManager().SetTimer(UnUsedHandle, this, &AWeaponBase::ResetCanFire, WeaponInfo.FireRate, false);
 
 		bool HasHit;
 		FHitResult HitResult;
@@ -78,15 +78,24 @@ void AWeaponBase::OnFire()
 		FVector Start;
 		FVector End;
 
-		if (IsShotgun)
+		if (WeaponInfo.IsShotgun)
 		{
-			for (int32 i = 0; i < ShotsPerFire; i++)
+			for (int32 i = 0; i < WeaponInfo.ShotsPerFire; i++)
 			{
 				CalculateStartAndEnd(Start,End);
-
-				FVector Spread = FVector((FMath::RandRange(-SpreadRadius, SpreadRadius)), (FMath::RandRange(-SpreadRadius, SpreadRadius)), (FMath::RandRange(-SpreadRadius, SpreadRadius)));
+				FVector Spread = FVector(
+					(FMath::RandRange(-WeaponInfo.SpreadRadius, WeaponInfo.SpreadRadius)),
+					(FMath::RandRange(-WeaponInfo.SpreadRadius, WeaponInfo.SpreadRadius)),
+					(FMath::RandRange(-WeaponInfo.SpreadRadius, WeaponInfo.SpreadRadius))
+				);
 				HasHit = GetWorld()->LineTraceSingleByChannel(HitResult, Start, (End + Spread), ECollisionChannel::ECC_Visibility);
 				DrawDebugLine(GetWorld(), Start, (End+Spread), FColor::Red, true);
+
+				if (HasHit)
+				{
+					UGameplayStatics::ApplyDamage(HitResult.GetActor(), WeaponInfo.Damage, PlayerCharacter->GetController(), nullptr, nullptr);
+					GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Green, FString::Printf(TEXT("I Hit: %s"), *HitResult.GetActor()->GetName()));
+				}
 			}
 		}
 		else
@@ -95,30 +104,30 @@ void AWeaponBase::OnFire()
 
 			HasHit = GetWorld()->LineTraceSingleByChannel(HitResult, Start, End, ECollisionChannel::ECC_Visibility);
 			DrawDebugLine(GetWorld(), Start, End, FColor::Red, true);
+
+			if (HasHit)
+			{
+				UGameplayStatics::ApplyDamage(HitResult.GetActor(), WeaponInfo.Damage, PlayerCharacter->GetController(), nullptr, nullptr);
+				GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Green, FString::Printf(TEXT("I Hit: %s"), *HitResult.GetActor()->GetName()));
+			}
 		}
 		
 		PlayerCharacter->AddControllerYawInput(FMath::RandRange(AddController.YawMin, AddController.YawMax));
 		PlayerCharacter->AddControllerPitchInput(FMath::RandRange(AddController.PitchMin, AddController.PitchMax));
-
-		if (HasHit)
-		{
-			UGameplayStatics::ApplyDamage(HitResult.GetActor(), WeaponDamage, PlayerCharacter->GetController(), nullptr, nullptr);
-			GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Green, FString::Printf(TEXT("I Hit: %s"), *HitResult.GetActor()->GetName()));
-		}
-
+		
 		// try and play the sound if specified
-		if (FireSound != NULL)
+		if (WeaponInfo.FireSound != NULL)
 		{
-			UGameplayStatics::PlaySoundAtLocation(this, FireSound, GetActorLocation());
+			UGameplayStatics::PlaySoundAtLocation(this, WeaponInfo.FireSound, GetActorLocation());
 		}
 		// try and play a firing animation if specified
-		if (FireAnimation1P != NULL && AnimInstance1P != NULL)
+		if (WeaponInfo.FireAnimation1P != NULL && AnimInstance1P != NULL)
 		{
-			AnimInstance1P->Montage_Play(FireAnimation1P, 1.f);
+			AnimInstance1P->Montage_Play(WeaponInfo.FireAnimation1P, 1.f);
 		}
-		if (FireAnimation3P != NULL && AnimInstance3P != NULL)
+		if (WeaponInfo.FireAnimation3P != NULL && AnimInstance3P != NULL)
 		{
-			AnimInstance3P->Montage_Play(FireAnimation3P, 1.f);
+			AnimInstance3P->Montage_Play(WeaponInfo.FireAnimation3P, 1.f);
 		}
 	}
 	else { return; }
@@ -130,9 +139,9 @@ void AWeaponBase::CalculateStartAndEnd(FVector& Start, FVector& End)
 	FVector PlayerVelocity = PlayerCharacter->GetVelocity();
 	float PlayerVelocityClamped = (ClampVector(PlayerVelocity, FVector(0), FVector(1))).Size();
 	FVector FinalSpray = FVector(
-		(FMath::RandRange(-SprayRange, SprayRange)*PlayerVelocityClamped),
-		(FMath::RandRange(-SprayRange, SprayRange)*PlayerVelocityClamped),
-		(FMath::RandRange(-SprayRange, SprayRange)*PlayerVelocityClamped)
+		(FMath::RandRange(-WeaponInfo.SprayRange, WeaponInfo.SprayRange)*PlayerVelocityClamped),
+		(FMath::RandRange(-WeaponInfo.SprayRange, WeaponInfo.SprayRange)*PlayerVelocityClamped),
+		(FMath::RandRange(-WeaponInfo.SprayRange, WeaponInfo.SprayRange)*PlayerVelocityClamped)
 	);
 	End = (GetCamera()->GetForwardVector() * 9999) + Start + FinalSpray;
 }
