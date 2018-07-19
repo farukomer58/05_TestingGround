@@ -12,18 +12,35 @@ enum class EWeaponClass : uint8
 	RifleFullAuto,
 	SniperOneShot
 };
+USTRUCT(BlueprintType)
+struct FAddController
+{
+	GENERATED_USTRUCT_BODY()
 
+public:
+	UPROPERTY(EditDefaultsOnly)
+	float YawMin = 0.3f;
+	UPROPERTY(EditDefaultsOnly)
+	float YawMax = -0.5f;
+	UPROPERTY(EditDefaultsOnly)
+	float PitchMin = 0.2f;
+	UPROPERTY(EditDefaultsOnly)
+	float PitchMax = -0.4f;
+};
 
-USTRUCT(/*BlueprintType*/)
+USTRUCT(BlueprintType)
 struct FWeaponInfo
 {
 	GENERATED_USTRUCT_BODY()
 
 public:
-	
+	UPROPERTY(EditDefaultsOnly)
 	float CurrentAmmo = 100.f;
+	UPROPERTY(EditDefaultsOnly)
 	float Damage = 50.f;;
+	UPROPERTY(EditDefaultsOnly)
 	float FireRate = 0.15f;
+	UPROPERTY(EditDefaultsOnly)
 	EWeaponClass WeaponClass;
 };
 
@@ -83,15 +100,34 @@ public:
 	class UAnimInstance* AnimInstance1P;
 	class UAnimInstance* AnimInstance3P;
 
+	UPROPERTY(EditDefaultsOnly)
+	FAddController AddController;
+
+	UPROPERTY(EditDefaultsOnly)
+	FWeaponInfo WeaponInfo;
+
 private:
 
-	//FVector GetCameraLocation();
+	void CalculateStartAndEnd(FVector& Start, FVector& End);
 
 	void ResetCanFire();
 
+	class UCameraComponent* GetCamera();
+
+	UPROPERTY(EditDefaultsOnly)
+	float SprayRange = 300.f;
+
+	UPROPERTY(EditDefaultsOnly)
+	float ShotsPerFire;
+	UPROPERTY(EditDefaultsOnly)
+	float SpreadRadius;
+
 	bool CanFire = true;
+
+	UPROPERTY(EditDefaultsOnly)
+	bool IsShotgun;
+
 	bool IsStarted = true;
-	//
 
 	class AMannequin* PlayerCharacter = nullptr;
 
