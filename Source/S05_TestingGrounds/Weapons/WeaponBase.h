@@ -79,14 +79,6 @@ class S05_TESTINGGROUNDS_API AWeaponBase : public AActor
 {
 	GENERATED_BODY()
 	
-	/** Gun mesh: 1st person view (seen only by self) */
-	UPROPERTY(VisibleDefaultsOnly, Category = Mesh)
-	class USkeletalMeshComponent* FP_Gun;
-
-	/** Location on gun mesh where projectiles should spawn. */
-	UPROPERTY(VisibleDefaultsOnly, Category = Mesh)
-	class USceneComponent* FP_MuzzleLocation;
-	
 public:	
 	// Sets default values for this actor's properties
 	AWeaponBase();
@@ -97,7 +89,14 @@ public:
 
 	/** Fires a projectile. */
 	UFUNCTION(BlueprintCallable)
-	void OnFire();
+	void OnFire(APawn* FiredPawn);
+	
+	void TurnOfAll();
+
+	void TurnOffPhysics() { GunMesh->SetSimulatePhysics(false); };
+
+	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = Mesh)
+	class UProjectileMovementComponent* ProjectileMovementComponent;
 
 	class UAnimInstance* AnimInstance1P;
 	class UAnimInstance* AnimInstance3P;
@@ -107,14 +106,32 @@ public:
 
 	UPROPERTY(EditDefaultsOnly)
 	FWeaponInfo WeaponInfo;
+protected:
+
+	/** Gun mesh: 1st person view (seen only by self) */
+	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = Mesh)
+	class USkeletalMeshComponent* GunMesh;
+
+	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = Mesh)
+	class UCapsuleComponent* InnerSphereCollision;
+
+	/** Location on gun mesh where projectiles should spawn. */
+	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = Mesh)
+	class USphereComponent* SphereCollision;
 
 private:
+	UFUNCTION()
+	void OnOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
+	UFUNCTION()
+	void OnEndOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex);
 
 	void CalculateStartAndEnd(FVector& Start, FVector& End);
 
 	void ResetCanFire();
 
 	class UCameraComponent* GetCamera();
+
+	bool CanPickup = true;
 
 	bool CanFire = true;
 

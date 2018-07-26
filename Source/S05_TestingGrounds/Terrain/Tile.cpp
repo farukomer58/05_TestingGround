@@ -105,7 +105,7 @@ void ATile::PlaceActor(TSubclassOf<APawn> ActorToSpawn, const FSpawnPosition& Sp
 	{
 		Spawned->AttachToActor(this, FAttachmentTransformRules(EAttachmentRule::KeepRelative, false));
 		Spawned->SetActorScale3D(FVector(SpawnPosition.Scale));
-		Spawned->SpawnDefaultController();
+		Spawned->SpawnDefaultController(); 
 		Spawned->Tags.Add(FName("Enemy"));
 	}
 }

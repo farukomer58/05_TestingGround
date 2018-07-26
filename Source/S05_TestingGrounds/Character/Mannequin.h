@@ -43,20 +43,40 @@ public:
 	UPROPERTY(VisibleAnywhere, meta = (AllowPrivateAccess = "true"))
 	class UCameraComponent* TP_Camera;
 
-	UPROPERTY(EditDefaultsOnly)
+	UPROPERTY(EditDefaultsOnly, meta = (EditCondition = "SpawnFromClass"))
 	TSubclassOf<class AWeaponBase> GunActor;
+
+	void Pickup(AActor* PickedActor);
+
+	bool CanPickup = true;
 
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
 
 	UPROPERTY(VisibleAnywhere)
+	class USphereComponent* CameraCollisionComp;
+
+	UPROPERTY(VisibleAnywhere)
 	class USkeletalMeshComponent* FP_ArmMesh;
 
 private:
+
+	void TryPickup();
+
+	void SpawnAndAttachWeapon(UClass* SpawnClass);
+
+	UPROPERTY(EditDefaultsOnly)
+	float SpawnTraceLength = 300.f;
+	UPROPERTY(EditDefaultsOnly)
+	float SpawnTraceLengthTP = 300.f;
+
+	UPROPERTY(EditDefaultsOnly)
+	bool SpawnFromClass;
+
 	bool canHandle = true;
 
 	FTimerHandle UnusedHandle;
 
-	AWeaponBase* Weapon;
+	AWeaponBase* CurrentWeapon;
 };

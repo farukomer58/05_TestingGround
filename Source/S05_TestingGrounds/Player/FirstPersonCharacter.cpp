@@ -97,7 +97,7 @@ void AFirstPersonCharacter::BeginPlay()
 	}
 	if (!InputComponent) { UE_LOG(LogTemp,Warning,TEXT("No Input Component")); return; }
 	// Bind fire event
-	InputComponent->BindAction("Fire", IE_Pressed, FP_Gun, &AWeaponBase::OnFire);
+	//InputComponent->BindAction("Fire", IE_Pressed, FP_Gun, &AWeaponBase::OnFire(this));
 }
 
 //////////////////////////////////////////////////////////////////////////

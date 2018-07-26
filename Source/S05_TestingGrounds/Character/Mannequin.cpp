@@ -4,7 +4,9 @@
 #include "Camera/CameraComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Components/CapsuleComponent.h"
+#include "Components/SphereComponent.h"
 #include "../Weapons/WeaponBase.h"
+#include "DrawDebugHelpers.h"
 #include "Engine/World.h"
 #include "Engine.h"
 
@@ -32,10 +34,14 @@ AMannequin::AMannequin()
 
 	Spring_Arm = CreateDefaultSubobject<USpringArmComponent>("SpringArm");
 	Spring_Arm->SetupAttachment(GetCapsuleComponent());
+	Spring_Arm->bAutoActivate = false;
 
 	TP_Camera = CreateDefaultSubobject<UCameraComponent>("TP_Camera");
 	TP_Camera->SetupAttachment(Spring_Arm);
-	TP_Camera->bAutoActivate = false;
+	TP_Camera->bAutoActivate = false; 
+
+	CameraCollisionComp = CreateDefaultSubobject<USphereComponent>(TEXT("CameraCollisionComp"));
+	CameraCollisionComp->SetupAttachment(Spring_Arm);
 
 }
 
@@ -44,30 +50,73 @@ void AMannequin::BeginPlay()
 {
 	Super::BeginPlay();
 
-	//Check if A GunBP is given
-	if (GunActor == NULL) { UE_LOG(LogTemp, Warning, TEXT("NO WEAPON GIVEN TO : %s"), *GetName()); return; }
-
-	Weapon = GetWorld()->SpawnActor<AWeaponBase>(GunActor);
-
-	if (ensure(Weapon == nullptr)) { return; }
-
-	if (IsPlayerControlled() && IsFirstPerson)
+	if (SpawnFromClass)
 	{
-		Weapon->AttachToComponent(FP_ArmMesh, FAttachmentTransformRules(EAttachmentRule::SnapToTarget, true), Weapon->WeaponInfo.SocketName1P);
+		SpawnAndAttachWeapon(GunActor);
 	}
-	else
-	{
-		Weapon->AttachToComponent(GetMesh(), FAttachmentTransformRules(EAttachmentRule::SnapToTarget, true), Weapon->WeaponInfo.SocketName3P);
-	}
-
-	Weapon->AnimInstance1P = FP_ArmMesh->GetAnimInstance();
-	Weapon->AnimInstance3P = GetMesh()->GetAnimInstance();
-
 	if (InputComponent != NULL)
 	{
 		InputComponent->BindAction("Fire", IE_Pressed, this, &AMannequin::TriggerTimer);
 		InputComponent->BindAction("Fire", IE_Released, this, &AMannequin::StopTriggerTimer);
+		InputComponent->BindAction("TryPickup", IE_Pressed, this, &AMannequin::TryPickup);
 	}
+}
+
+void AMannequin::TryPickup()
+{
+	if (CanPickup)
+	{
+		FHitResult HitResult;
+		FCollisionQueryParams CollisionObjectQueryParams;
+		CollisionObjectQueryParams.AddIgnoredActor(this);
+
+		UCameraComponent* UsedCamera = IsFirstPerson ? FP_Camera : TP_Camera;
+		FVector Start = UsedCamera->GetComponentLocation();
+		if (SpawnTraceLengthTP > 0.0f)
+		{
+			SpawnTraceLength = SpawnTraceLengthTP;
+		}
+		FVector End = (UsedCamera->GetForwardVector() * SpawnTraceLength) + Start;
+		bool HasHit = GetWorld()->LineTraceSingleByChannel(HitResult,Start,End,ECollisionChannel::ECC_Visibility, CollisionObjectQueryParams);
+		
+		DrawDebugLine(GetWorld(), Start, End, FColor::Green, false, 4.f);
+
+		if (HasHit)
+		{
+			if (Cast<AWeaponBase>(HitResult.GetActor()))
+			{
+				UE_LOG(LogTemp, Error, TEXT("You can pickup: %s"), *HitResult.GetActor()->GetName());
+				Pickup(HitResult.GetActor());
+			}
+			else {
+				UE_LOG(LogTemp, Warning, TEXT("You can NOT pickup: %s"), *HitResult.GetActor()->GetName());
+			}
+		}
+
+	}
+}
+
+void AMannequin::SpawnAndAttachWeapon(UClass* SpawnClass)
+{
+	if (SpawnClass == NULL) { UE_LOG(LogTemp, Warning, TEXT("NO CurrentWeapon GIVEN TO : %s"), *GetName()); return; }
+	CurrentWeapon = GetWorld()->SpawnActor<AWeaponBase>(SpawnClass,GetActorTransform());
+	if (ensure(CurrentWeapon == nullptr)) { return; }
+	CurrentWeapon->TurnOfAll();
+
+	if (IsPlayerControlled() && IsFirstPerson)
+	{
+		UE_LOG(LogTemp, Error, TEXT("SPawn begin Attaching to : %s"), *CurrentWeapon->WeaponInfo.SocketName1P.ToString());
+		CurrentWeapon->AttachToComponent(FP_ArmMesh, FAttachmentTransformRules::SnapToTargetIncludingScale, CurrentWeapon->WeaponInfo.SocketName1P);
+	}
+	else
+	{
+		UE_LOG(LogTemp, Error, TEXT(" %s : SPawn begin Attaching to : %s"), *this->GetName(), *CurrentWeapon->WeaponInfo.SocketName3P.ToString());
+		CurrentWeapon->AttachToComponent(GetMesh(), FAttachmentTransformRules::SnapToTargetIncludingScale, CurrentWeapon->WeaponInfo.SocketName3P);
+		//CurrentWeapon->AttachToComponent(GetMesh(), FAttachmentTransformRules(EAttachmentRule::SnapToTarget, true), FName("WeaponSocket1P"));
+	}
+
+	CurrentWeapon->AnimInstance1P = FP_ArmMesh->GetAnimInstance();
+	CurrentWeapon->AnimInstance3P = GetMesh()->GetAnimInstance();
 }
 
 // Called every frame
@@ -75,13 +124,12 @@ void AMannequin::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
-	/*if (ensure(CameraCollision)) { return; }
+	if (ensure(CameraCollisionComp)) { return; }
 
 	UE_LOG(LogTemp, Warning, TEXT("is Ticking..."));
 
-
 	FOverlapInfo OverlapInfo;
-	CameraCollision->IsOverlappingComponent(OverlapInfo);
+	CameraCollisionComp->IsOverlappingComponent(OverlapInfo);
 
 	UE_LOG(LogTemp, Warning, TEXT("camera hit : %s"), *OverlapInfo.OverlapInfo.Component->GetName());
 
@@ -92,7 +140,7 @@ void AMannequin::Tick(float DeltaTime)
 		}
 		else {
 			GetMesh()->bOwnerNoSee = false;
-		}*/
+		}
 
 }
 // Called to bind functionality to input
@@ -100,21 +148,23 @@ void AMannequin::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent
 {
 	Super::SetupPlayerInputComponent(PlayerInputComponent);
 }
-
 void AMannequin::UnPossessed()
 {
 	Super::UnPossessed();
 
-	if (ensure(Weapon == nullptr)) { return; }
+	if (ensure(CurrentWeapon == nullptr)) { return; }
 
-	Weapon->AttachToComponent(GetMesh(), FAttachmentTransformRules(EAttachmentRule::SnapToTarget, true), Weapon->WeaponInfo.SocketName3P);
+	CurrentWeapon->AttachToComponent(GetMesh(), FAttachmentTransformRules(EAttachmentRule::SnapToTarget, true), CurrentWeapon->WeaponInfo.SocketName3P);
 }
 void AMannequin::PullTrigger()
 {
-	Weapon->OnFire();
+	if (!ensure(CurrentWeapon)) { return; }
+	CurrentWeapon->OnFire(this);
 }
 void AMannequin::TriggerTimer()
 {
+	if (!(CurrentWeapon)) { return; }
+
 	if (canHandle)
 	{
 		PullTrigger();
@@ -131,3 +181,11 @@ void AMannequin::StopTriggerTimer()
 	GetWorldTimerManager().ClearTimer(UnusedHandle);
 	canHandle = true;
 }
+
+void AMannequin::Pickup(AActor* PickedActor)
+{
+	SpawnAndAttachWeapon(PickedActor->GetClass());
+
+	PickedActor->Destroy();
+}
+

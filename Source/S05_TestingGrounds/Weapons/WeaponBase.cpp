@@ -1,17 +1,20 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 #include "WeaponBase.h"
+
 #include "BallProjectile.h"
 #include "../Character/Mannequin.h"
+
 #include "Components/SkeletalMeshComponent.h"
+#include "Components/SphereComponent.h"
+#include "Components/CapsuleComponent.h"
+#include "GameFramework/ProjectileMovementComponent.h"
 #include "Camera/CameraComponent.h"
-#include "Kismet/GameplayStatics.h"
 #include "Animation/AnimInstance.h"
+#include "Kismet/GameplayStatics.h"
+#include "Engine/World.h"
 #include "DrawDebugHelpers.h"
 #include "Engine.h"
-#include "Engine/World.h"
-#include "Camera/CameraComponent.h"
-
 
 // Sets default values
 AWeaponBase::AWeaponBase()
@@ -19,24 +22,68 @@ AWeaponBase::AWeaponBase()
  	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = true;
 
-	// Create a gun mesh component
-	FP_Gun = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("FP_Gun"));
-	FP_Gun->bCastDynamicShadow = false;
-	FP_Gun->CastShadow = false;
-	// FP_Gun->SetupAttachment(Mesh1P, TEXT("GripPoint"));
-	SetRootComponent(FP_Gun);
-	//FP_Gun->SetupAttachment(RootComponent);
 
-	FP_MuzzleLocation = CreateDefaultSubobject<USceneComponent>(TEXT("MuzzleLocation"));
-	FP_MuzzleLocation->SetupAttachment(FP_Gun);
-	FP_MuzzleLocation->SetRelativeLocation(FVector(0.2f, 48.4f, -10.6f));
+
+	// Create a gun mesh component
+	GunMesh = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("GunMesh"));
+	GunMesh->bCastDynamicShadow = false;
+	GunMesh->CastShadow = false;
+	// GunMesh->SetupAttachment(Mesh1P, TEXT("GripPoint"));
+	SetRootComponent(GunMesh);
+	GunMesh->SetCollisionResponseToChannel(ECC_Visibility, ECR_Block);
+	//GunMesh->SetupAttachment(RootComponent);
+
+	InnerSphereCollision = CreateDefaultSubobject<UCapsuleComponent>(TEXT("InnerSphereCollision"));
+	InnerSphereCollision->SetupAttachment(GunMesh);
+	InnerSphereCollision->SetCollisionResponseToChannel(ECC_Visibility, ECR_Block);
+
+	SphereCollision = CreateDefaultSubobject<USphereComponent>(TEXT("SphereCollision"));
+	SphereCollision->SetupAttachment(GunMesh);
+	SphereCollision->SetCollisionResponseToChannel(ECC_Visibility, ECR_Ignore);
+
+	ProjectileMovementComponent = CreateDefaultSubobject<UProjectileMovementComponent>(TEXT("ProjectileMovementComponent"));
+
+	SphereCollision->OnComponentBeginOverlap.AddDynamic(this, &AWeaponBase::OnOverlap);
+	SphereCollision->OnComponentEndOverlap.AddDynamic(this, &AWeaponBase::OnEndOverlap);
 }
 
 // Called when the game starts or when spawned
 void AWeaponBase::BeginPlay()
 {
 	Super::BeginPlay();
+
+	GunMesh->SetSimulatePhysics(true);
+
 	PlayerCharacter = Cast<AMannequin>(UGameplayStatics::GetPlayerCharacter(GetWorld(),0));
+}
+void AWeaponBase::OnOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
+{
+	if (OtherActor == PlayerCharacter)
+	{
+		CanPickup = true;
+		PlayerCharacter->CanPickup = CanPickup;
+		GunMesh->SetRenderCustomDepth(true);
+		EnableInput(GetWorld()->GetFirstPlayerController());
+	}
+}
+void AWeaponBase::OnEndOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex)
+{
+
+	if (OtherActor == PlayerCharacter)
+	{
+		CanPickup = false;
+		PlayerCharacter->CanPickup = CanPickup;
+		GunMesh->SetRenderCustomDepth(false);
+		EnableInput(GetWorld()->GetFirstPlayerController());
+	}
+}
+void AWeaponBase::TurnOfAll()
+{
+	GunMesh->SetSimulatePhysics(false);
+	GunMesh->SetRenderCustomDepth(false);
+	CanPickup = false;
+	SphereCollision->bGenerateOverlapEvents = false;
+	SphereCollision->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 }
 // Called every frame
 void AWeaponBase::Tick(float DeltaTime)
@@ -44,7 +91,7 @@ void AWeaponBase::Tick(float DeltaTime)
 	Super::Tick(DeltaTime);
 }
 
-void AWeaponBase::OnFire()
+void AWeaponBase::OnFire(APawn* FiredPawn)
 {
 	// try and fire a projectile
 	/*if (projectileclass != null)
@@ -74,6 +121,9 @@ void AWeaponBase::OnFire()
 
 		bool HasHit;
 		FHitResult HitResult;
+		FCollisionQueryParams CollisionQueryParams;
+		CollisionQueryParams.AddIgnoredActor(this);
+		CollisionQueryParams.AddIgnoredActor(FiredPawn);
 
 		FVector Start;
 		FVector End;
@@ -88,7 +138,7 @@ void AWeaponBase::OnFire()
 					(FMath::RandRange(-WeaponInfo.SpreadRadius, WeaponInfo.SpreadRadius)),
 					(FMath::RandRange(-WeaponInfo.SpreadRadius, WeaponInfo.SpreadRadius))
 				);
-				HasHit = GetWorld()->LineTraceSingleByChannel(HitResult, Start, (End + Spread), ECollisionChannel::ECC_Visibility);
+				HasHit = GetWorld()->LineTraceSingleByChannel(HitResult, Start, (End + Spread), ECollisionChannel::ECC_Visibility, CollisionQueryParams);
 				DrawDebugLine(GetWorld(), Start, (End+Spread), FColor::Red, true);
 
 				if (HasHit)
@@ -102,7 +152,7 @@ void AWeaponBase::OnFire()
 		{
 			CalculateStartAndEnd(Start,End);
 
-			HasHit = GetWorld()->LineTraceSingleByChannel(HitResult, Start, End, ECollisionChannel::ECC_Visibility);
+			HasHit = GetWorld()->LineTraceSingleByChannel(HitResult, Start, End, ECollisionChannel::ECC_Visibility, CollisionQueryParams);
 			DrawDebugLine(GetWorld(), Start, End, FColor::Red, true);
 
 			if (HasHit)
