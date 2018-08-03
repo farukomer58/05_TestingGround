@@ -9,8 +9,10 @@
 UENUM(/*BlueprintType*/)
 enum class EWeaponClass : uint8
 {
-	RifleFullAuto,
-	SniperOneShot
+	PrimaryWeapon,
+	SecondaryWeapon,
+	Melee,
+	Grenade
 };
 USTRUCT(BlueprintType)
 struct FAddController
@@ -93,7 +95,7 @@ public:
 	
 	void TurnOfAll();
 
-	void TurnOffPhysics() { GunMesh->SetSimulatePhysics(false); };
+	void EnableAll();
 
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = Mesh)
 	class UProjectileMovementComponent* ProjectileMovementComponent;

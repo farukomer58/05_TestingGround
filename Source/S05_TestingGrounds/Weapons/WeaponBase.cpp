@@ -22,8 +22,6 @@ AWeaponBase::AWeaponBase()
  	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = true;
 
-
-
 	// Create a gun mesh component
 	GunMesh = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("GunMesh"));
 	GunMesh->bCastDynamicShadow = false;
@@ -31,15 +29,18 @@ AWeaponBase::AWeaponBase()
 	// GunMesh->SetupAttachment(Mesh1P, TEXT("GripPoint"));
 	SetRootComponent(GunMesh);
 	GunMesh->SetCollisionResponseToChannel(ECC_Visibility, ECR_Block);
+	GunMesh->SetCollisionResponseToChannel(ECC_GameTraceChannel3, ECR_Ignore);
 	//GunMesh->SetupAttachment(RootComponent);
 
 	InnerSphereCollision = CreateDefaultSubobject<UCapsuleComponent>(TEXT("InnerSphereCollision"));
 	InnerSphereCollision->SetupAttachment(GunMesh);
 	InnerSphereCollision->SetCollisionResponseToChannel(ECC_Visibility, ECR_Block);
+	InnerSphereCollision->SetCollisionResponseToChannel(ECC_GameTraceChannel3, ECR_Ignore);
 
 	SphereCollision = CreateDefaultSubobject<USphereComponent>(TEXT("SphereCollision"));
 	SphereCollision->SetupAttachment(GunMesh);
 	SphereCollision->SetCollisionResponseToChannel(ECC_Visibility, ECR_Ignore);
+	SphereCollision->SetCollisionResponseToChannel(ECC_GameTraceChannel3, ECR_Ignore);
 
 	ProjectileMovementComponent = CreateDefaultSubobject<UProjectileMovementComponent>(TEXT("ProjectileMovementComponent"));
 
@@ -52,7 +53,9 @@ void AWeaponBase::BeginPlay()
 {
 	Super::BeginPlay();
 
+	GunMesh->Mobility = EComponentMobility::Movable;
 	GunMesh->SetSimulatePhysics(true);
+	ProjectileMovementComponent->Deactivate();
 
 	PlayerCharacter = Cast<AMannequin>(UGameplayStatics::GetPlayerCharacter(GetWorld(),0));
 }
@@ -68,7 +71,6 @@ void AWeaponBase::OnOverlap(UPrimitiveComponent* OverlappedComponent, AActor* Ot
 }
 void AWeaponBase::OnEndOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex)
 {
-
 	if (OtherActor == PlayerCharacter)
 	{
 		CanPickup = false;
@@ -85,6 +87,14 @@ void AWeaponBase::TurnOfAll()
 	SphereCollision->bGenerateOverlapEvents = false;
 	SphereCollision->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 }
+
+void AWeaponBase::EnableAll()
+{
+	GunMesh->SetSimulatePhysics(true);
+	SphereCollision->bGenerateOverlapEvents = true;
+	SphereCollision->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+}
+
 // Called every frame
 void AWeaponBase::Tick(float DeltaTime)
 {
@@ -124,6 +134,7 @@ void AWeaponBase::OnFire(APawn* FiredPawn)
 		FCollisionQueryParams CollisionQueryParams;
 		CollisionQueryParams.AddIgnoredActor(this);
 		CollisionQueryParams.AddIgnoredActor(FiredPawn);
+		CollisionQueryParams.bTraceComplex=true;
 
 		FVector Start;
 		FVector End;
@@ -138,7 +149,8 @@ void AWeaponBase::OnFire(APawn* FiredPawn)
 					(FMath::RandRange(-WeaponInfo.SpreadRadius, WeaponInfo.SpreadRadius)),
 					(FMath::RandRange(-WeaponInfo.SpreadRadius, WeaponInfo.SpreadRadius))
 				);
-				HasHit = GetWorld()->LineTraceSingleByChannel(HitResult, Start, (End + Spread), ECollisionChannel::ECC_Visibility, CollisionQueryParams);
+				HasHit = GetWorld()->LineTraceSingleByChannel(HitResult, Start, (End + Spread), ECollisionChannel::ECC_GameTraceChannel3, CollisionQueryParams);
+
 				DrawDebugLine(GetWorld(), Start, (End+Spread), FColor::Red, true);
 
 				if (HasHit)
@@ -152,7 +164,7 @@ void AWeaponBase::OnFire(APawn* FiredPawn)
 		{
 			CalculateStartAndEnd(Start,End);
 
-			HasHit = GetWorld()->LineTraceSingleByChannel(HitResult, Start, End, ECollisionChannel::ECC_Visibility, CollisionQueryParams);
+			HasHit = GetWorld()->LineTraceSingleByChannel(HitResult, Start, End, ECollisionChannel::ECC_GameTraceChannel3, CollisionQueryParams);
 			DrawDebugLine(GetWorld(), Start, End, FColor::Red, true);
 
 			if (HasHit)
@@ -206,7 +218,6 @@ UCameraComponent* AWeaponBase::GetCamera()
 		return PlayerCharacter->TP_Camera;
 	}
 }
-
 void AWeaponBase::ResetCanFire()
 {
 	CanFire = true;

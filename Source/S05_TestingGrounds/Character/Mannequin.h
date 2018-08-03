@@ -30,8 +30,11 @@ public:
 	void StopTriggerTimer();
 	void StartTriggerTimer();
 
+	void Pickup(AActor* PickedActor);
 
-	UPROPERTY(EditDefaultsOnly)
+	void SwitchCamPosition();
+
+	UPROPERTY(EditDefaultsOnly,BlueprintReadWrite)
 	bool IsFirstPerson;
 
 	UPROPERTY(VisibleAnywhere, meta = (AllowPrivateAccess = "true"))
@@ -46,16 +49,11 @@ public:
 	UPROPERTY(EditDefaultsOnly, meta = (EditCondition = "SpawnFromClass"))
 	TSubclassOf<class AWeaponBase> GunActor;
 
-	void Pickup(AActor* PickedActor);
-
 	bool CanPickup = true;
 
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
-
-	UPROPERTY(VisibleAnywhere)
-	class USphereComponent* CameraCollisionComp;
 
 	UPROPERTY(VisibleAnywhere)
 	class USkeletalMeshComponent* FP_ArmMesh;
@@ -64,7 +62,15 @@ private:
 
 	void TryPickup();
 
+	void Drop();
+	void DropSec();
+
+	void ToggleCam();
+
 	void SpawnAndAttachWeapon(UClass* SpawnClass);
+	void SpawnAndAttach();
+
+	UClass* SpawningClass;
 
 	UPROPERTY(EditDefaultsOnly)
 	float SpawnTraceLength = 300.f;
@@ -72,11 +78,20 @@ private:
 	float SpawnTraceLengthTP = 300.f;
 
 	UPROPERTY(EditDefaultsOnly)
+	float ThrowMultiplier = 1.f;
+	UPROPERTY(EditDefaultsOnly)
 	bool SpawnFromClass;
+
+	bool canFire = true;
+	bool isFiring;
 
 	bool canHandle = true;
 
 	FTimerHandle UnusedHandle;
 
-	AWeaponBase* CurrentWeapon;
+	void AttachAndSet(AWeaponBase* Weapon);
+
+	AWeaponBase* CurrentWeapon = nullptr;
+	AWeaponBase* PrimaryWeapon = nullptr;
+	AWeaponBase* SecondaryWeapon = nullptr;
 };
