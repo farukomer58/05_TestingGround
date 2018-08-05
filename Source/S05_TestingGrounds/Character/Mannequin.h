@@ -62,6 +62,10 @@ private:
 
 	void TryPickup();
 
+	void StartFire();
+	void EndFire();
+
+
 	void Drop();
 	void DropSec();
 
@@ -89,9 +93,21 @@ private:
 
 	FTimerHandle UnusedHandle;
 
-	void AttachAndSet(AWeaponBase* Weapon);
+	UPROPERTY(EditDefaultsOnly)
+	bool PickupAttachDirect;
 
+	bool PrimaryInHand;
+	bool SecondaryInHand;
+
+	void SetAndAttach(AWeaponBase* Weapon);
+
+	void AttachToHand(AWeaponBase* Weapon);
+	void AttachToBack(AWeaponBase* Weapon);
+
+	UPROPERTY(VisibleAnywhere)
 	AWeaponBase* CurrentWeapon = nullptr;
+	UPROPERTY(VisibleAnywhere)
 	AWeaponBase* PrimaryWeapon = nullptr;
+	UPROPERTY(VisibleAnywhere)
 	AWeaponBase* SecondaryWeapon = nullptr;
 };

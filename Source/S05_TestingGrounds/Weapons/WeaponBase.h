@@ -36,31 +36,35 @@ struct FWeaponInfo
 	GENERATED_USTRUCT_BODY()
 
 public:
-	UPROPERTY(EditDefaultsOnly)
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
 	float CurrentAmmo = 100.f;
-	UPROPERTY(EditDefaultsOnly)
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
 	float Damage = 50.f;;
-	UPROPERTY(EditDefaultsOnly)
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
 	float FireRate = 0.15f;
-	UPROPERTY(EditDefaultsOnly)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	EWeaponClass WeaponClass;
-	UPROPERTY(EditDefaultsOnly)
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
 	float SprayRange = 300.f;
-	UPROPERTY(EditDefaultsOnly)
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
 	bool IsShotgun;
-	UPROPERTY(EditDefaultsOnly, meta = (EditCondition = "IsShotgun"))
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, meta = (EditCondition = "IsShotgun"))
 	float ShotsPerFire;
-	UPROPERTY(EditDefaultsOnly, meta = (EditCondition = "IsShotgun"))
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, meta = (EditCondition = "IsShotgun"))
 	float SpreadRadius;
 
 
-	UPROPERTY(EditDefaultsOnly)
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
 	FName SocketName1P;
-	UPROPERTY(EditDefaultsOnly)
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
 	FName SocketName3P;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
+	FName PrimaryBack;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
+	FName SecondaryBack;
 
 	/** Projectile class to spawn */
-	UPROPERTY(EditDefaultsOnly, Category = Projectile)
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = Projectile)
 	TSubclassOf<class ABallProjectile> ProjectileClass;
 
 	/** Sound to play each time we fire */
@@ -92,6 +96,9 @@ public:
 	/** Fires a projectile. */
 	UFUNCTION(BlueprintCallable)
 	void OnFire(APawn* FiredPawn);
+
+	void StartFire();
+	void EndFire();
 	
 	void TurnOfAll();
 
@@ -106,9 +113,10 @@ public:
 	UPROPERTY(EditDefaultsOnly)
 	FAddController AddController;
 
-	UPROPERTY(EditDefaultsOnly)
+	UPROPERTY(EditAnywhere,BlueprintReadWrite)
 	FWeaponInfo WeaponInfo;
 protected:
+	void PlayFireEffects(FVector TracerEndPoint);
 
 	/** Gun mesh: 1st person view (seen only by self) */
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = Mesh)
@@ -120,6 +128,8 @@ protected:
 	/** Location on gun mesh where projectiles should spawn. */
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = Mesh)
 	class USphereComponent* SphereCollision;
+
+	FTimerHandle TimerHandle_Fire;
 
 private:
 	UFUNCTION()

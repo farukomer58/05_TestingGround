@@ -40,7 +40,6 @@ AMannequin::AMannequin()
 	TP_Camera = CreateDefaultSubobject<UCameraComponent>("TP_Camera");
 	TP_Camera->SetupAttachment(Spring_Arm);
 	TP_Camera->bAutoActivate = false; 
-
 }
 
 // Called when the game starts or when spawned
@@ -133,9 +132,15 @@ void AMannequin::TryPickup()
 
 	}
 }
+void AMannequin::Pickup(AActor* PickedActor)
+{
+	SpawnAndAttachWeapon(PickedActor->GetClass());
+
+	PickedActor->Destroy();
+}
 void AMannequin::Drop()
 {
-	if (CurrentWeapon)
+	if (PrimaryInHand)
 	{
 		if (!isFiring)
 		{
@@ -157,22 +162,63 @@ void AMannequin::Drop()
 			FTimerHandle HandleDrop;
 			GetWorldTimerManager().SetTimer(HandleDrop, this, &AMannequin::DropSec, 0.05f, false);
 			canFire = false;
+			PrimaryInHand = false;
+			PrimaryWeapon = nullptr;
+		}
+	}
+	else {
+		if (!isFiring)
+		{
+			CurrentWeapon->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
+
+			float ThrowSpeed;
+			if ((GetVelocity().Size()*2.5f) < 200)
+			{
+				ThrowSpeed = 500.f;
+			}
+			else {
+				ThrowSpeed = (GetVelocity().Size()*2.5f);
+			}
+			UCameraComponent* CameraToUse = IsFirstPerson ? FP_Camera : TP_Camera;
+			FVector MadeVelocity = ((CameraToUse->GetForwardVector()*ThrowSpeed) + (CameraToUse->GetUpVector() * 300)) * ThrowMultiplier;
+			CurrentWeapon->ProjectileMovementComponent->Velocity = MadeVelocity;
+			CurrentWeapon->ProjectileMovementComponent->Activate();
+
+			FTimerHandle HandleDrop;
+			GetWorldTimerManager().SetTimer(HandleDrop, this, &AMannequin::DropSec, 0.05f, false);
+			canFire = false;
+			SecondaryInHand = false;
+			SecondaryWeapon = nullptr;
 		}
 	}
 }
 void AMannequin::DropSec()
 {
 	CurrentWeapon->EnableAll();
-	CurrentWeapon = nullptr;
+
+	if (!PrimaryInHand && SecondaryWeapon)
+	{
+		AttachToHand(SecondaryWeapon);
+		UE_LOG(LogTemp, Warning, TEXT("i have secondary weapon! should make that my current"));
+	}
+	else {
+		CurrentWeapon = nullptr;
+
+		if (!SecondaryInHand && PrimaryWeapon)
+		{
+			AttachToHand(PrimaryWeapon);
+		}
+		else {
+			CurrentWeapon = nullptr;
+		}
+	}
 }
 
 void AMannequin::SpawnAndAttachWeapon(UClass* SpawnClass)
 {
 	if (SpawnClass == NULL) { UE_LOG(LogTemp, Warning, TEXT("NO CurrentWeapon GIVEN TO : %s"), *GetName()); return; }
-
 	/*If Possible if CurrentWeapon is SET*/
-	Drop();
-
+	//Drop();
 	SpawningClass = SpawnClass;
 
 	FTimerHandle QuickHandle;
@@ -180,34 +226,98 @@ void AMannequin::SpawnAndAttachWeapon(UClass* SpawnClass)
 }
 void AMannequin::SpawnAndAttach()
 {
-	CurrentWeapon = GetWorld()->SpawnActor<AWeaponBase>(SpawningClass, GetActorTransform());
+	if (!ensure(SpawningClass)) { return; }
+	AWeaponBase* SpawnedWeapon = GetWorld()->SpawnActor<AWeaponBase>(SpawningClass, GetActorTransform());
 	canFire = true;
 
-	if (ensure(CurrentWeapon == nullptr)) { return; }
+	if (ensure(SpawnedWeapon == nullptr)) { return; }
 	
-	if (CurrentWeapon->WeaponInfo.WeaponClass == EWeaponClass::PrimaryWeapon)
+	if (SpawnedWeapon->WeaponInfo.WeaponClass == EWeaponClass::PrimaryWeapon)
 	{
-		PrimaryWeapon = CurrentWeapon;
+		PrimaryWeapon = SpawnedWeapon;
+		SetAndAttach(PrimaryWeapon);
 	}
-
-	AttachAndSet(CurrentWeapon);
+	if (SpawnedWeapon->WeaponInfo.WeaponClass == EWeaponClass::SecondaryWeapon)
+	{
+		SecondaryWeapon = SpawnedWeapon;
+		SetAndAttach(SecondaryWeapon);
+	}
 }
-void AMannequin::AttachAndSet(AWeaponBase* Weapon)
+void AMannequin::AttachToHand(AWeaponBase* Weapon)
 {
-	Weapon->TurnOfAll();
+	CurrentWeapon = Weapon;
+
 	if (IsPlayerControlled() && IsFirstPerson)
 	{
-		Weapon->AttachToComponent(FP_ArmMesh, FAttachmentTransformRules::SnapToTargetIncludingScale, CurrentWeapon->WeaponInfo.SocketName1P);
+		Weapon->AttachToComponent(FP_ArmMesh, FAttachmentTransformRules::SnapToTargetIncludingScale, Weapon->WeaponInfo.SocketName1P);
 	}
 	else
 	{
-		Weapon->AttachToComponent(GetMesh(), FAttachmentTransformRules::SnapToTargetIncludingScale, CurrentWeapon->WeaponInfo.SocketName3P);
+		Weapon->AttachToComponent(GetMesh(), FAttachmentTransformRules::SnapToTargetIncludingScale, Weapon->WeaponInfo.SocketName3P);
 	}
 
+	if(Weapon->WeaponInfo.WeaponClass==EWeaponClass::PrimaryWeapon)
+		PrimaryInHand = true;
+	if (Weapon->WeaponInfo.WeaponClass == EWeaponClass::SecondaryWeapon)
+		SecondaryInHand = true;
+}
+void AMannequin::AttachToBack(AWeaponBase* Weapon)
+{
+	if (Weapon->WeaponInfo.WeaponClass== EWeaponClass::PrimaryWeapon)
+	{
+		Weapon->AttachToComponent(GetMesh(), FAttachmentTransformRules::SnapToTargetIncludingScale, Weapon->WeaponInfo.PrimaryBack);
+	}
+	else
+	{
+		Weapon->AttachToComponent(GetMesh(), FAttachmentTransformRules::SnapToTargetIncludingScale, Weapon->WeaponInfo.SecondaryBack);
+	}
+
+	if (Weapon->WeaponInfo.WeaponClass == EWeaponClass::PrimaryWeapon)
+		PrimaryInHand = false;
+	if (Weapon->WeaponInfo.WeaponClass == EWeaponClass::SecondaryWeapon)
+		SecondaryInHand = false;
+}
+void AMannequin::SetAndAttach(AWeaponBase* Weapon)
+{
+	Weapon->TurnOfAll();
 	Weapon->AnimInstance1P = FP_ArmMesh->GetAnimInstance();
 	Weapon->AnimInstance3P = GetMesh()->GetAnimInstance();
-}
 
+	if (Weapon->WeaponInfo.WeaponClass == EWeaponClass::PrimaryWeapon)
+	{
+		if (SecondaryInHand)
+		{
+			if (PickupAttachDirect)
+			{
+				AttachToHand(Weapon);
+				AttachToBack(SecondaryWeapon);
+			}
+			else {
+				AttachToBack(Weapon);
+			}
+		}
+		else {
+			AttachToHand(Weapon);
+		}
+	}
+	else {
+		if (PrimaryInHand)
+		{
+			if (PickupAttachDirect)
+			{
+				AttachToHand(Weapon);
+				AttachToBack(PrimaryWeapon);
+			}
+			else {
+				AttachToBack(Weapon);
+			}
+		}
+		else {
+			AttachToHand(Weapon);
+		}
+	}
+	
+}
 
 // Called every frame
 void AMannequin::Tick(float DeltaTime)
@@ -231,6 +341,7 @@ void AMannequin::UnPossessed()
 void AMannequin::PullTrigger()
 {
 	if (!ensure(CurrentWeapon)&& !canFire) { return; }
+	if (CurrentWeapon == nullptr) { UE_LOG(LogTemp, Warning, TEXT("NO CURRENT WEAPON")); return; }
 	isFiring = true;
 	CurrentWeapon->OnFire(this);
 }
@@ -255,10 +366,18 @@ void AMannequin::StopTriggerTimer()
 	canHandle = true;
 	isFiring = false;
 }
-void AMannequin::Pickup(AActor* PickedActor)
+void AMannequin::StartFire()
 {
-	SpawnAndAttachWeapon(PickedActor->GetClass());
-
-	PickedActor->Destroy();
+	if (CurrentWeapon)
+	{
+		CurrentWeapon->StartFire();
+	}
+}
+void AMannequin::EndFire()
+{
+	if (CurrentWeapon)
+	{
+		CurrentWeapon->EndFire();
+	}
 }
 

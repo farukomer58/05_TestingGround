@@ -30,24 +30,26 @@ AWeaponBase::AWeaponBase()
 	SetRootComponent(GunMesh);
 	GunMesh->SetCollisionResponseToChannel(ECC_Visibility, ECR_Block);
 	GunMesh->SetCollisionResponseToChannel(ECC_GameTraceChannel3, ECR_Ignore);
+	GunMesh->SetCollisionResponseToChannel(ECC_Camera, ECR_Ignore);
 	//GunMesh->SetupAttachment(RootComponent);
 
 	InnerSphereCollision = CreateDefaultSubobject<UCapsuleComponent>(TEXT("InnerSphereCollision"));
 	InnerSphereCollision->SetupAttachment(GunMesh);
 	InnerSphereCollision->SetCollisionResponseToChannel(ECC_Visibility, ECR_Block);
 	InnerSphereCollision->SetCollisionResponseToChannel(ECC_GameTraceChannel3, ECR_Ignore);
+	InnerSphereCollision->SetCollisionResponseToChannel(ECC_Camera, ECR_Ignore);
 
 	SphereCollision = CreateDefaultSubobject<USphereComponent>(TEXT("SphereCollision"));
 	SphereCollision->SetupAttachment(GunMesh);
 	SphereCollision->SetCollisionResponseToChannel(ECC_Visibility, ECR_Ignore);
 	SphereCollision->SetCollisionResponseToChannel(ECC_GameTraceChannel3, ECR_Ignore);
+	SphereCollision->SetCollisionResponseToChannel(ECC_Camera, ECR_Ignore);
 
 	ProjectileMovementComponent = CreateDefaultSubobject<UProjectileMovementComponent>(TEXT("ProjectileMovementComponent"));
 
 	SphereCollision->OnComponentBeginOverlap.AddDynamic(this, &AWeaponBase::OnOverlap);
 	SphereCollision->OnComponentEndOverlap.AddDynamic(this, &AWeaponBase::OnEndOverlap);
 }
-
 // Called when the game starts or when spawned
 void AWeaponBase::BeginPlay()
 {
@@ -174,25 +176,39 @@ void AWeaponBase::OnFire(APawn* FiredPawn)
 			}
 		}
 		
-		PlayerCharacter->AddControllerYawInput(FMath::RandRange(AddController.YawMin, AddController.YawMax));
-		PlayerCharacter->AddControllerPitchInput(FMath::RandRange(AddController.PitchMin, AddController.PitchMax));
 		
-		// try and play the sound if specified
-		if (WeaponInfo.FireSound != NULL)
-		{
-			UGameplayStatics::PlaySoundAtLocation(this, WeaponInfo.FireSound, GetActorLocation());
-		}
-		// try and play a firing animation if specified
-		if (WeaponInfo.FireAnimation1P != NULL && AnimInstance1P != NULL)
-		{
-			AnimInstance1P->Montage_Play(WeaponInfo.FireAnimation1P, 1.f);
-		}
-		if (WeaponInfo.FireAnimation3P != NULL && AnimInstance3P != NULL)
-		{
-			AnimInstance3P->Montage_Play(WeaponInfo.FireAnimation3P, 1.f);
-		}
 	}
 	else { return; }
+}
+void AWeaponBase::StartFire()
+{
+	float FirstDelay = FMath::Max(LastFireTime + TimeBetweenShots - GetWorld()->TimeSeconds, 0.0f);
+
+	GetWorldTimerManager().SetTimer(TimerHandle_Fire, this, &ASWeapon::OnFire, TimeBetweenShots, true, FirstDelay);
+}
+void AWeaponBase::EndFire()
+{
+	GetWorldTimerManager().ClearTimer(TimerHandle_Fire);
+}
+void PlayFireEffects(FVector TracerEndPoint)
+{
+	PlayerCharacter->AddControllerYawInput(FMath::RandRange(AddController.YawMin, AddController.YawMax));
+	PlayerCharacter->AddControllerPitchInput(FMath::RandRange(AddController.PitchMin, AddController.PitchMax));
+
+	// try and play the sound if specified
+	if (WeaponInfo.FireSound != NULL)
+	{
+		UGameplayStatics::PlaySoundAtLocation(this, WeaponInfo.FireSound, GetActorLocation());
+	}
+	// try and play a firing animation if specified
+	if (WeaponInfo.FireAnimation1P != NULL && AnimInstance1P != NULL)
+	{
+		AnimInstance1P->Montage_Play(WeaponInfo.FireAnimation1P, 1.f);
+	}
+	if (WeaponInfo.FireAnimation3P != NULL && AnimInstance3P != NULL)
+	{
+		AnimInstance3P->Montage_Play(WeaponInfo.FireAnimation3P, 1.f);
+	}
 }
 
 void AWeaponBase::CalculateStartAndEnd(FVector& Start, FVector& End)
@@ -207,7 +223,6 @@ void AWeaponBase::CalculateStartAndEnd(FVector& Start, FVector& End)
 	);
 	End = (GetCamera()->GetForwardVector() * 9999) + Start + FinalSpray;
 }
-
 UCameraComponent* AWeaponBase::GetCamera()
 {
 	if (PlayerCharacter->IsFirstPerson)
