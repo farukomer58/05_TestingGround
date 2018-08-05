@@ -26,16 +26,14 @@ public:
 	UFUNCTION(BlueprintCallable)
 	void PullTrigger();
 
-	void TriggerTimer();
-	void StopTriggerTimer();
-	void StartTriggerTimer();
-
 	void Pickup(AActor* PickedActor);
 
 	void SwitchCamPosition();
 
 	UPROPERTY(EditDefaultsOnly,BlueprintReadWrite)
 	bool IsFirstPerson;
+
+	bool CanPickup = true;
 
 	UPROPERTY(VisibleAnywhere, meta = (AllowPrivateAccess = "true"))
 	class UCameraComponent* FP_Camera;
@@ -49,8 +47,6 @@ public:
 	UPROPERTY(EditDefaultsOnly, meta = (EditCondition = "SpawnFromClass"))
 	TSubclassOf<class AWeaponBase> GunActor;
 
-	bool CanPickup = true;
-
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
@@ -59,12 +55,15 @@ protected:
 	class USkeletalMeshComponent* FP_ArmMesh;
 
 private:
-
+	
 	void TryPickup();
+	void SetAndAttach(AWeaponBase* Weapon);
+
+	void AttachToHand(AWeaponBase* Weapon);
+	void AttachToBack(AWeaponBase* Weapon);
 
 	void StartFire();
 	void EndFire();
-
 
 	void Drop();
 	void DropSec();
@@ -78,31 +77,24 @@ private:
 
 	UPROPERTY(EditDefaultsOnly)
 	float SpawnTraceLength = 300.f;
+
 	UPROPERTY(EditDefaultsOnly)
 	float SpawnTraceLengthTP = 300.f;
 
 	UPROPERTY(EditDefaultsOnly)
 	float ThrowMultiplier = 1.f;
+
 	UPROPERTY(EditDefaultsOnly)
 	bool SpawnFromClass;
 
+	UPROPERTY(EditDefaultsOnly)
+	bool PickupAttachDirect;
+	
 	bool canFire = true;
 	bool isFiring;
 
-	bool canHandle = true;
-
-	FTimerHandle UnusedHandle;
-
-	UPROPERTY(EditDefaultsOnly)
-	bool PickupAttachDirect;
-
 	bool PrimaryInHand;
 	bool SecondaryInHand;
-
-	void SetAndAttach(AWeaponBase* Weapon);
-
-	void AttachToHand(AWeaponBase* Weapon);
-	void AttachToBack(AWeaponBase* Weapon);
 
 	UPROPERTY(VisibleAnywhere)
 	AWeaponBase* CurrentWeapon = nullptr;

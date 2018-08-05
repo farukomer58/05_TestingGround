@@ -222,7 +222,7 @@ void AMannequinAI::PullTrigger()
 {
 	if (!ensure(CurrentWeapon) && !canFire) { return; }
 	isFiring = true;
-	CurrentWeapon->OnFire(this);
+	CurrentWeapon->OnFire();
 }
 void AMannequinAI::TriggerTimer()
 {

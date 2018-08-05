@@ -55,8 +55,8 @@ void AMannequin::BeginPlay()
 	}
 	if (InputComponent != NULL)
 	{
-		InputComponent->BindAction("Fire", IE_Pressed, this, &AMannequin::TriggerTimer);
-		InputComponent->BindAction("Fire", IE_Released, this, &AMannequin::StopTriggerTimer);
+		InputComponent->BindAction("Fire", IE_Pressed, this, &AMannequin::StartFire);
+		InputComponent->BindAction("Fire", IE_Released, this, &AMannequin::EndFire);
 		InputComponent->BindAction("TryPickup", IE_Pressed, this, &AMannequin::TryPickup);
 		InputComponent->BindAction("Drop", IE_Pressed, this, &AMannequin::Drop);
 		InputComponent->BindAction("ToggleCam", IE_Pressed, this, &AMannequin::ToggleCam);
@@ -108,6 +108,8 @@ void AMannequin::TryPickup()
 		FHitResult HitResult;
 		FCollisionQueryParams CollisionObjectQueryParams;
 		CollisionObjectQueryParams.AddIgnoredActor(this);
+		if(CurrentWeapon)
+			CollisionObjectQueryParams.AddIgnoredActor(CurrentWeapon);
 
 		UCameraComponent* UsedCamera = IsFirstPerson ? FP_Camera : TP_Camera;
 		FVector Start = UsedCamera->GetComponentLocation();
@@ -140,6 +142,8 @@ void AMannequin::Pickup(AActor* PickedActor)
 }
 void AMannequin::Drop()
 {
+	if (CurrentWeapon == nullptr) { return; }
+
 	if (PrimaryInHand)
 	{
 		if (!isFiring)
@@ -227,7 +231,11 @@ void AMannequin::SpawnAndAttachWeapon(UClass* SpawnClass)
 void AMannequin::SpawnAndAttach()
 {
 	if (!ensure(SpawningClass)) { return; }
-	AWeaponBase* SpawnedWeapon = GetWorld()->SpawnActor<AWeaponBase>(SpawningClass, GetActorTransform());
+	FActorSpawnParameters SpawnParams;
+	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	AWeaponBase* SpawnedWeapon = GetWorld()->SpawnActor<AWeaponBase>(SpawningClass, GetActorTransform(), SpawnParams);
+
+	SpawnedWeapon->SetOwner(this);
 	canFire = true;
 
 	if (ensure(SpawnedWeapon == nullptr)) { return; }
@@ -338,39 +346,19 @@ void AMannequin::UnPossessed()
 
 	CurrentWeapon->AttachToComponent(GetMesh(), FAttachmentTransformRules(EAttachmentRule::SnapToTarget, true), CurrentWeapon->WeaponInfo.SocketName3P);
 }
+
 void AMannequin::PullTrigger()
 {
-	if (!ensure(CurrentWeapon)&& !canFire) { return; }
-	if (CurrentWeapon == nullptr) { UE_LOG(LogTemp, Warning, TEXT("NO CURRENT WEAPON")); return; }
-	isFiring = true;
-	CurrentWeapon->OnFire(this);
+	if (!ensure(CurrentWeapon) && !canFire) { return; }
+	CurrentWeapon->OnFire();
 }
-void AMannequin::TriggerTimer()
-{
-	if (!(CurrentWeapon) && !canFire) { return; }
 
-	if (canHandle)
-	{
-		PullTrigger();
-		StartTriggerTimer();
-		canHandle = false;
-	}
-}
-void AMannequin::StartTriggerTimer()
-{
-	GetWorldTimerManager().SetTimer(UnusedHandle, this, &AMannequin::PullTrigger, 0.01, true);
-}
-void AMannequin::StopTriggerTimer()
-{
-	GetWorldTimerManager().ClearTimer(UnusedHandle);
-	canHandle = true;
-	isFiring = false;
-}
 void AMannequin::StartFire()
 {
 	if (CurrentWeapon)
 	{
 		CurrentWeapon->StartFire();
+		isFiring = true;
 	}
 }
 void AMannequin::EndFire()
@@ -378,6 +366,7 @@ void AMannequin::EndFire()
 	if (CurrentWeapon)
 	{
 		CurrentWeapon->EndFire();
+		isFiring = false;
 	}
 }
 

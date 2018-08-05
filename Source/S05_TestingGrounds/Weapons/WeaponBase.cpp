@@ -14,6 +14,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "Engine/World.h"
 #include "DrawDebugHelpers.h"
+#include "TimerManager.h"
 #include "Engine.h"
 
 // Sets default values
@@ -102,59 +103,37 @@ void AWeaponBase::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 }
-
-void AWeaponBase::OnFire(APawn* FiredPawn)
+void AWeaponBase::OnFire()
 {
-	// try and fire a projectile
-	/*if (projectileclass != null)
+	AActor* ActorOwner = GetOwner();
+
+	if (ActorOwner)
 	{
-
-		const frotator spawnrotation = fp_muzzlelocation->getcomponentrotation();
-		// muzzleoffset is in camera space, so transform it to world space before offsetting from the character location to find the final muzzle position
-		const fvector spawnlocation = fp_muzzlelocation->getcomponentlocation();
-
-		//set spawn collision handling override
-		factorspawnparameters actorspawnparams;
-		actorspawnparams.spawncollisionhandlingoverride = espawnactorcollisionhandlingmethod::adjustifpossiblebutdontspawnifcolliding;
-
-		uworld* const world = getworld();
-		if (world != null)
-		{
-			// spawn the projectile at the muzzle
-			world->spawnactor<aballprojectile>(projectileclass, spawnlocation, spawnrotation, actorspawnparams);
-		}
-	}*/
-	
-	if (CanFire)
-	{
-		CanFire = false;
-		FTimerHandle UnUsedHandle;
-		GetWorldTimerManager().SetTimer(UnUsedHandle, this, &AWeaponBase::ResetCanFire, WeaponInfo.FireRate, false);
-
 		bool HasHit;
-		FHitResult HitResult;
-		FCollisionQueryParams CollisionQueryParams;
-		CollisionQueryParams.AddIgnoredActor(this);
-		CollisionQueryParams.AddIgnoredActor(FiredPawn);
-		CollisionQueryParams.bTraceComplex=true;
-
 		FVector Start;
 		FVector End;
+
+		FVector TracerEndPoint = End;
+
+		FHitResult HitResult;
+		FCollisionQueryParams QueryParams;
+		QueryParams.AddIgnoredActor(ActorOwner);
+		QueryParams.AddIgnoredActor(this);
+		QueryParams.bTraceComplex = true;
+		QueryParams.bReturnPhysicalMaterial = true;
 
 		if (WeaponInfo.IsShotgun)
 		{
 			for (int32 i = 0; i < WeaponInfo.ShotsPerFire; i++)
 			{
-				CalculateStartAndEnd(Start,End);
+				CalculateStartAndEnd(Start, End);
 				FVector Spread = FVector(
 					(FMath::RandRange(-WeaponInfo.SpreadRadius, WeaponInfo.SpreadRadius)),
 					(FMath::RandRange(-WeaponInfo.SpreadRadius, WeaponInfo.SpreadRadius)),
 					(FMath::RandRange(-WeaponInfo.SpreadRadius, WeaponInfo.SpreadRadius))
 				);
-				HasHit = GetWorld()->LineTraceSingleByChannel(HitResult, Start, (End + Spread), ECollisionChannel::ECC_GameTraceChannel3, CollisionQueryParams);
-
-				DrawDebugLine(GetWorld(), Start, (End+Spread), FColor::Red, true);
-
+				HasHit = GetWorld()->LineTraceSingleByChannel(HitResult, Start, (End + Spread), ECollisionChannel::ECC_GameTraceChannel3, QueryParams);
+				DrawDebugLine(GetWorld(), Start, (End + Spread), FColor::Red, true);
 				if (HasHit)
 				{
 					UGameplayStatics::ApplyDamage(HitResult.GetActor(), WeaponInfo.Damage, PlayerCharacter->GetController(), nullptr, nullptr);
@@ -164,9 +143,9 @@ void AWeaponBase::OnFire(APawn* FiredPawn)
 		}
 		else
 		{
-			CalculateStartAndEnd(Start,End);
+			CalculateStartAndEnd(Start, End);
 
-			HasHit = GetWorld()->LineTraceSingleByChannel(HitResult, Start, End, ECollisionChannel::ECC_GameTraceChannel3, CollisionQueryParams);
+			HasHit = GetWorld()->LineTraceSingleByChannel(HitResult, Start, End, ECollisionChannel::ECC_GameTraceChannel3, QueryParams);
 			DrawDebugLine(GetWorld(), Start, End, FColor::Red, true);
 
 			if (HasHit)
@@ -175,22 +154,67 @@ void AWeaponBase::OnFire(APawn* FiredPawn)
 				GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Green, FString::Printf(TEXT("I Hit: %s"), *HitResult.GetActor()->GetName()));
 			}
 		}
-		
-		
+		//these are special Headshot Particles
+
+		/*if (HasHit)
+		{
+			AActor* HitActor = HitResult.GetActor();
+
+			EPhysicalSurface  SurfaceType = UPhysicalMaterial::DetermineSurfaceType(HitResult.PhysMaterial.Get());
+
+			float ActualDamage = WeaponInfo.Damage;
+			if (SurfaceType == SURFACE_FLESHVULNERABLE)
+			{
+				ActualDamage *= 4.f;
+			}
+
+			UGameplayStatics::ApplyPointDamage(HitActor, ActualDamage, ShotDirection, HitResult, ActorOwner->GetInstigatorController(), this, DamageType);
+			UParticleSystem* SelectedEffect = nullptr;
+
+			switch (SurfaceType)
+			{
+			case SURFACE_FLESHDEFAULT:
+			case SURFACE_FLESHVULNERABLE:
+				SelectedEffect = FleshImpactParticle;
+				break;
+			default:
+				SelectedEffect = DefaultImpactParticle;
+				break;
+			}
+
+			if (SelectedEffect)
+			{
+				UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), SelectedEffect, HitResult.ImpactPoint, HitResult.Normal.Rotation());
+			}
+
+			TracerEndPoint = HitResult.ImpactPoint;
+		}
+
+		if (DebugWeaponDrawing > 0)
+			DrawDebugLine(GetWorld(), EyeLocation, TraceEnd, FColor::White, false, 1.f, 0, 2.f);
+
+		PlayFireEffects(TracerEndPoint);
+
+		LastFireTime = GetWorld()->TimeSeconds;
+	}*/
+
+		PlayFireEffects(TracerEndPoint);
+
+		LastFireTime = GetWorld()->TimeSeconds;
 	}
-	else { return; }
 }
+
 void AWeaponBase::StartFire()
 {
-	float FirstDelay = FMath::Max(LastFireTime + TimeBetweenShots - GetWorld()->TimeSeconds, 0.0f);
+	float FirstDelay = FMath::Max(LastFireTime + WeaponInfo.FireRate - GetWorld()->TimeSeconds, 0.0f);
 
-	GetWorldTimerManager().SetTimer(TimerHandle_Fire, this, &ASWeapon::OnFire, TimeBetweenShots, true, FirstDelay);
+	GetWorldTimerManager().SetTimer(TimerHandle_Fire, this, &AWeaponBase::OnFire, WeaponInfo.FireRate, true, FirstDelay);
 }
 void AWeaponBase::EndFire()
 {
 	GetWorldTimerManager().ClearTimer(TimerHandle_Fire);
 }
-void PlayFireEffects(FVector TracerEndPoint)
+void AWeaponBase::PlayFireEffects(FVector TracerEndPoint)
 {
 	PlayerCharacter->AddControllerYawInput(FMath::RandRange(AddController.YawMin, AddController.YawMax));
 	PlayerCharacter->AddControllerPitchInput(FMath::RandRange(AddController.PitchMin, AddController.PitchMax));
@@ -232,10 +256,6 @@ UCameraComponent* AWeaponBase::GetCamera()
 	else {
 		return PlayerCharacter->TP_Camera;
 	}
-}
-void AWeaponBase::ResetCanFire()
-{
-	CanFire = true;
 }
 
 

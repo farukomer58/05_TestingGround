@@ -14,6 +14,7 @@ enum class EWeaponClass : uint8
 	Melee,
 	Grenade
 };
+
 USTRUCT(BlueprintType)
 struct FAddController
 {
@@ -95,13 +96,12 @@ public:
 
 	/** Fires a projectile. */
 	UFUNCTION(BlueprintCallable)
-	void OnFire(APawn* FiredPawn);
+	void OnFire();
 
 	void StartFire();
 	void EndFire();
 	
 	void TurnOfAll();
-
 	void EnableAll();
 
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = Mesh)
@@ -118,6 +118,10 @@ public:
 protected:
 	void PlayFireEffects(FVector TracerEndPoint);
 
+	float LastFireTime;
+
+	FTimerHandle TimerHandle_Fire;
+
 	/** Gun mesh: 1st person view (seen only by self) */
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = Mesh)
 	class USkeletalMeshComponent* GunMesh;
@@ -129,8 +133,6 @@ protected:
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = Mesh)
 	class USphereComponent* SphereCollision;
 
-	FTimerHandle TimerHandle_Fire;
-
 private:
 	UFUNCTION()
 	void OnOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
@@ -139,15 +141,9 @@ private:
 
 	void CalculateStartAndEnd(FVector& Start, FVector& End);
 
-	void ResetCanFire();
-
 	class UCameraComponent* GetCamera();
 
 	bool CanPickup = true;
-
-	bool CanFire = true;
-
-	bool IsStarted = true;
 
 	class AMannequin* PlayerCharacter = nullptr;
 
