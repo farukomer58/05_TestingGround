@@ -79,6 +79,9 @@ public:
 	/** AnimMontage to play each time we fire */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Gameplay)
 	class UAnimMontage* FireAnimation3P;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Gameplay)
+	class UTexture* ImageUI;
 };
 
 UCLASS()

@@ -7,6 +7,8 @@
 #include "Components/SphereComponent.h"
 #include "GameFramework/ProjectileMovementComponent.h"
 #include "../Weapons/WeaponBase.h"
+#include "../Weapons/Melee/MeleeActor.h"
+#include "../NadeActor.h"
 #include "DrawDebugHelpers.h"
 #include "Engine/World.h"
 #include "Engine.h"
@@ -53,6 +55,15 @@ void AMannequin::BeginPlay()
 	{
 		SpawnAndAttachWeapon(GunActor);
 	}
+
+	Nade = GetWorld()->SpawnActor<ANadeActor>(NadeActor);
+	Nade->SetOwner(this);
+	AttachNadeToBack(Nade);
+
+	Melee = GetWorld()->SpawnActor<AMeleeActor>(MeleeActor);
+	Melee->SetOwner(this);
+	AttachNadeToBack(Melee);
+
 	if (InputComponent != NULL)
 	{
 		InputComponent->BindAction("Fire", IE_Pressed, this, &AMannequin::StartFire);
@@ -60,6 +71,11 @@ void AMannequin::BeginPlay()
 		InputComponent->BindAction("TryPickup", IE_Pressed, this, &AMannequin::TryPickup);
 		InputComponent->BindAction("Drop", IE_Pressed, this, &AMannequin::Drop);
 		InputComponent->BindAction("ToggleCam", IE_Pressed, this, &AMannequin::ToggleCam);
+
+		InputComponent->BindAction("PrimaryEquip", IE_Pressed, this, &AMannequin::PrimaryEquip);
+		InputComponent->BindAction("SecondaryEquip", IE_Pressed, this, &AMannequin::SecondaryEquip);
+		InputComponent->BindAction("MeleeEquip", IE_Pressed, this, &AMannequin::MeleeEquip);
+		InputComponent->BindAction("NadeEquip", IE_Pressed, this, &AMannequin::NadeEquip);
 	}
 }
 
@@ -74,8 +90,13 @@ void AMannequin::SwitchCamPosition()
 		TP_Camera->SetActive(false);
 		Spring_Arm->bUsePawnControlRotation = false;
 		SpawnTraceLengthTP = 0.0f;
-		if(CurrentWeapon)
-			CurrentWeapon->AttachToComponent(FP_ArmMesh, FAttachmentTransformRules::SnapToTargetIncludingScale, CurrentWeapon->WeaponInfo.SocketName1P);
+		
+		AttachToHand(CurrentWeapon);
+		if(NadeInHand)
+			AttachNadeToHand(Nade);
+		if (MeleeInHand)
+		AttachNadeToHand(Melee);
+
 	}
 	else {
 		FP_ArmMesh->SetHiddenInGame(true);
@@ -84,8 +105,12 @@ void AMannequin::SwitchCamPosition()
 		TP_Camera->SetActive(true);
 		Spring_Arm->bUsePawnControlRotation = true;
 		SpawnTraceLengthTP = 600.f;
-		if(CurrentWeapon)
-			CurrentWeapon->AttachToComponent(GetMesh(), FAttachmentTransformRules::SnapToTargetIncludingScale, CurrentWeapon->WeaponInfo.SocketName3P);
+
+		AttachToHand(CurrentWeapon);
+		if (NadeInHand)
+			AttachNadeToHand(Nade);
+		if (MeleeInHand)
+			AttachNadeToHand(Melee);
 	}
 }
 void AMannequin::ToggleCam()
@@ -253,15 +278,17 @@ void AMannequin::SpawnAndAttach()
 }
 void AMannequin::AttachToHand(AWeaponBase* Weapon)
 {
+	if (Weapon == nullptr) { return; }
+
 	CurrentWeapon = Weapon;
 
 	if (IsPlayerControlled() && IsFirstPerson)
 	{
-		Weapon->AttachToComponent(FP_ArmMesh, FAttachmentTransformRules::SnapToTargetIncludingScale, Weapon->WeaponInfo.SocketName1P);
+		Weapon->AttachToComponent(FP_ArmMesh, FAttachmentTransformRules::SnapToTargetNotIncludingScale, Weapon->WeaponInfo.SocketName1P);
 	}
 	else
 	{
-		Weapon->AttachToComponent(GetMesh(), FAttachmentTransformRules::SnapToTargetIncludingScale, Weapon->WeaponInfo.SocketName3P);
+		Weapon->AttachToComponent(GetMesh(), FAttachmentTransformRules::SnapToTargetNotIncludingScale, Weapon->WeaponInfo.SocketName3P);
 	}
 
 	if(Weapon->WeaponInfo.WeaponClass==EWeaponClass::PrimaryWeapon)
@@ -271,13 +298,15 @@ void AMannequin::AttachToHand(AWeaponBase* Weapon)
 }
 void AMannequin::AttachToBack(AWeaponBase* Weapon)
 {
+	if (Weapon == nullptr) { return; }
+
 	if (Weapon->WeaponInfo.WeaponClass== EWeaponClass::PrimaryWeapon)
 	{
-		Weapon->AttachToComponent(GetMesh(), FAttachmentTransformRules::SnapToTargetIncludingScale, Weapon->WeaponInfo.PrimaryBack);
+		Weapon->AttachToComponent(GetMesh(), FAttachmentTransformRules::SnapToTargetNotIncludingScale, Weapon->WeaponInfo.PrimaryBack);
 	}
 	else
 	{
-		Weapon->AttachToComponent(GetMesh(), FAttachmentTransformRules::SnapToTargetIncludingScale, Weapon->WeaponInfo.SecondaryBack);
+		Weapon->AttachToComponent(GetMesh(), FAttachmentTransformRules::SnapToTargetNotIncludingScale, Weapon->WeaponInfo.SecondaryBack);
 	}
 
 	if (Weapon->WeaponInfo.WeaponClass == EWeaponClass::PrimaryWeapon)
@@ -297,12 +326,22 @@ void AMannequin::SetAndAttach(AWeaponBase* Weapon)
 		{
 			if (PickupAttachDirect)
 			{
-				AttachToHand(Weapon);
 				AttachToBack(SecondaryWeapon);
+				AttachToHand(Weapon);
 			}
 			else {
 				AttachToBack(Weapon);
 			}
+		}
+		else if (NadeInHand)
+		{
+			AttachNadeToBack(Nade);
+			AttachToHand(Weapon);
+		}
+		else if (MeleeInHand)
+		{
+			AttachNadeToBack(Melee);
+			AttachToHand(Weapon);
 		}
 		else {
 			AttachToHand(Weapon);
@@ -313,18 +352,179 @@ void AMannequin::SetAndAttach(AWeaponBase* Weapon)
 		{
 			if (PickupAttachDirect)
 			{
-				AttachToHand(Weapon);
 				AttachToBack(PrimaryWeapon);
+				AttachToHand(Weapon);
 			}
 			else {
 				AttachToBack(Weapon);
 			}
+		}
+		else if (NadeInHand)
+		{
+			AttachNadeToBack(Nade);
+			AttachToHand(Weapon);
+		}
+		else if (MeleeInHand)
+		{
+			AttachNadeToBack(Melee);
+			AttachToHand(Weapon);
 		}
 		else {
 			AttachToHand(Weapon);
 		}
 	}
 	
+}
+
+void AMannequin::AttachNadeToHand(AActor* ActorToAttach)
+{
+	if (ActorToAttach == nullptr) { return; }
+
+	ANadeActor* CastNade = Cast<ANadeActor>(ActorToAttach);
+	if (CastNade)
+	{
+		if (IsPlayerControlled() && IsFirstPerson)
+		{
+			ActorToAttach->AttachToComponent(FP_ArmMesh, FAttachmentTransformRules::SnapToTargetNotIncludingScale, CastNade->NadeInfo.SocketName1P);
+		}
+		else
+		{
+			ActorToAttach->AttachToComponent(GetMesh(), FAttachmentTransformRules::SnapToTargetNotIncludingScale, CastNade->NadeInfo.SocketName3P);
+		}
+		NadeInHand = true;
+		PlayAnimMontage(Nade->NadeInfo.ThrowPosition);
+	}
+	else {
+		AMeleeActor* CastMelee = Cast<AMeleeActor>(ActorToAttach);
+		if (CastMelee)
+		{
+			if (IsPlayerControlled() && IsFirstPerson)
+			{
+				ActorToAttach->AttachToComponent(FP_ArmMesh, FAttachmentTransformRules::SnapToTargetNotIncludingScale, CastMelee->MeleeInfo.SocketName1P);
+			}
+			else
+			{
+				ActorToAttach->AttachToComponent(GetMesh(), FAttachmentTransformRules::SnapToTargetNotIncludingScale, CastMelee->MeleeInfo.SocketName3P);
+			}
+			MeleeInHand = true;
+		}
+	}
+
+
+}
+void AMannequin::AttachNadeToBack(AActor* ActorToAttach)
+{
+	if (ActorToAttach == nullptr) { return; }
+
+	ANadeActor* CastNade = Cast<ANadeActor>(ActorToAttach);
+	if (CastNade)
+	{
+		ActorToAttach->AttachToComponent(GetMesh(), FAttachmentTransformRules::SnapToTargetNotIncludingScale, CastNade->NadeInfo.NadeBackSocket);
+		NadeInHand = false;
+	}
+	else
+	{
+		AMeleeActor* CastMelee = Cast<AMeleeActor>(ActorToAttach);
+		if (CastMelee)
+		{
+			ActorToAttach->AttachToComponent(GetMesh(), FAttachmentTransformRules::SnapToTargetNotIncludingScale, CastMelee->MeleeInfo.MeleeBackSocket);
+			
+			MeleeInHand = false;
+		}
+	}
+}
+
+void AMannequin::PrimaryEquip()
+{
+	if (PrimaryWeapon== nullptr) { return; }
+
+	if (SecondaryInHand)
+	{
+		AttachToBack(SecondaryWeapon);
+		AttachToHand(PrimaryWeapon);
+	}
+	else if (NadeInHand)
+		{
+			AttachNadeToBack(Nade);
+			AttachToHand(PrimaryWeapon);
+		}
+	else if (MeleeInHand)
+		{
+			AttachNadeToBack(Melee);
+			AttachToHand(PrimaryWeapon);
+		}
+	else{
+		AttachToHand(PrimaryWeapon);
+	}
+}
+void AMannequin::SecondaryEquip()
+{
+	if (SecondaryWeapon == nullptr) { return; }
+
+	if (PrimaryInHand)
+	{
+		AttachToBack(PrimaryWeapon);
+		AttachToHand(SecondaryWeapon);
+	}
+	else if (NadeInHand)
+	{
+		AttachNadeToBack(Nade);
+		AttachToHand(SecondaryWeapon);
+	}
+	else if (MeleeInHand)
+	{
+		AttachNadeToBack(Melee);
+		AttachToHand(SecondaryWeapon);
+	}
+	else {
+		AttachToHand(SecondaryWeapon);
+	}
+}
+void AMannequin::MeleeEquip()
+{
+	if (Melee == nullptr) { return; }
+
+	if (PrimaryInHand)
+	{
+		AttachToBack(PrimaryWeapon);
+		AttachNadeToHand(Melee);
+	}
+	else if (SecondaryInHand)
+	{
+		AttachToBack(SecondaryWeapon);
+		AttachNadeToHand(Melee);
+	}
+	else if (NadeInHand)
+	{
+		AttachNadeToBack(Nade);
+		AttachNadeToHand(Melee);
+	}
+	else {
+		AttachNadeToHand(Melee);
+	}
+}
+void AMannequin::NadeEquip()
+{
+	if (Nade == nullptr) { return; }
+	
+	if (PrimaryInHand)
+	{
+		AttachToBack(PrimaryWeapon);
+		AttachNadeToHand(Nade);
+	}
+	else if (SecondaryInHand)
+	{
+		AttachToBack(SecondaryWeapon);
+		AttachNadeToHand(Nade);
+	}
+	else if (MeleeInHand)
+	{
+		AttachNadeToBack(Melee);
+		AttachNadeToHand(Nade);
+	}
+	else {
+		AttachNadeToHand(Nade);
+	}
 }
 
 // Called every frame
@@ -352,10 +552,14 @@ void AMannequin::PullTrigger()
 	if (!ensure(CurrentWeapon) && !canFire) { return; }
 	CurrentWeapon->OnFire();
 }
-
 void AMannequin::StartFire()
 {
-	if (CurrentWeapon)
+
+	if (NadeInHand)
+	{
+		Nade->ThrowNade();
+	}
+	else if (CurrentWeapon)
 	{
 		CurrentWeapon->StartFire();
 		isFiring = true;
@@ -368,5 +572,19 @@ void AMannequin::EndFire()
 		CurrentWeapon->EndFire();
 		isFiring = false;
 	}
+}
+
+void AMannequin::GetWeapons(AWeaponBase*& CurrentWeaponOut, AWeaponBase*& PrimaryWeaponOut, AWeaponBase*& SecondaryWeaponOut, ANadeActor*& NadeOut, AMeleeActor*& MeleeOut)
+{
+	if (CurrentWeapon)
+		CurrentWeaponOut = CurrentWeapon;
+	if (PrimaryWeapon)
+		PrimaryWeaponOut = PrimaryWeapon;
+	if (SecondaryWeapon)
+		SecondaryWeaponOut = SecondaryWeapon;
+	if (Nade)
+		NadeOut = Nade;
+	if (Melee)
+		MeleeOut = Melee;
 }
 
