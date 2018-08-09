@@ -59,7 +59,6 @@ void AMannequin::BeginPlay()
 	{
 		Nade = GetWorld()->SpawnActor<ANadeActor>(NadeActor);
 		Nade->SetOwner(this);
-		Nade->AnimInstance = GetMesh()->GetAnimInstance();
 		AttachNadeToBack(Nade);
 	}
 	if (MeleeActor)
@@ -68,6 +67,7 @@ void AMannequin::BeginPlay()
 		Melee->SetOwner(this);
 		AttachNadeToBack(Melee);
 	}
+
 	if (InputComponent != NULL)
 	{
 		InputComponent->BindAction("Fire", IE_Pressed, this, &AMannequin::StartFire);
@@ -154,11 +154,8 @@ void AMannequin::TryPickup()
 		{
 			if (Cast<AWeaponBase>(HitResult.GetActor()))
 			{
-				UE_LOG(LogTemp, Error, TEXT("You can pickup: %s"), *HitResult.GetActor()->GetName());
+				//UE_LOG(LogTemp, Error, TEXT("You can pickup: %s"), *HitResult.GetActor()->GetName());
 				Pickup(HitResult.GetActor());
-			}
-			else {
-				UE_LOG(LogTemp, Warning, TEXT("You can NOT pickup: %s"), *HitResult.GetActor()->GetName());
 			}
 		}
 
@@ -170,95 +167,18 @@ void AMannequin::Pickup(AActor* PickedActor)
 
 	PickedActor->Destroy();
 }
-void AMannequin::Drop()
-{
-	if (CurrentWeapon == nullptr) { return; }
-
-	if (PrimaryInHand)
-	{
-		if (!isFiring)
-		{
-			CurrentWeapon->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
-
-			float ThrowSpeed;
-			if ((GetVelocity().Size()*2.5f) < 200)
-			{
-				ThrowSpeed = 500.f;
-			}
-			else {
-				ThrowSpeed = (GetVelocity().Size()*2.5f);
-			}
-			UCameraComponent* CameraToUse = IsFirstPerson ? FP_Camera : TP_Camera;
-			FVector MadeVelocity = ((CameraToUse->GetForwardVector()*ThrowSpeed) + (CameraToUse->GetUpVector() * 300)) * ThrowMultiplier;
-			CurrentWeapon->ProjectileMovementComponent->Velocity = MadeVelocity;
-			CurrentWeapon->ProjectileMovementComponent->Activate();
-
-			FTimerHandle HandleDrop;
-			GetWorldTimerManager().SetTimer(HandleDrop, this, &AMannequin::DropSec, 0.05f, false);
-			
-			bUseControllerRotationYaw = false;
-			canFire = false;
-			PrimaryInHand = false;
-			WeaponCombat = false;
-			PrimaryWeapon = nullptr;
-		}
-	}
-	else {
-		if (!isFiring)
-		{
-			CurrentWeapon->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
-
-			float ThrowSpeed;
-			if ((GetVelocity().Size()*2.5f) < 200)
-			{
-				ThrowSpeed = 500.f;
-			}
-			else {
-				ThrowSpeed = (GetVelocity().Size()*2.5f);
-			}
-			UCameraComponent* CameraToUse = IsFirstPerson ? FP_Camera : TP_Camera;
-			FVector MadeVelocity = ((CameraToUse->GetForwardVector()*ThrowSpeed) + (CameraToUse->GetUpVector() * 300)) * ThrowMultiplier;
-			CurrentWeapon->ProjectileMovementComponent->Velocity = MadeVelocity;
-			CurrentWeapon->ProjectileMovementComponent->Activate();
-
-			FTimerHandle HandleDrop;
-			GetWorldTimerManager().SetTimer(HandleDrop, this, &AMannequin::DropSec, 0.05f, false);
-			
-			bUseControllerRotationYaw = false;
-			canFire = false;
-			SecondaryInHand = false;
-			WeaponCombat = false;
-			SecondaryWeapon = nullptr;
-		}
-	}
-}
-void AMannequin::DropSec()
-{
-	CurrentWeapon->EnableAll();
-
-	if (!PrimaryInHand && SecondaryWeapon)
-	{
-		AttachToHand(SecondaryWeapon);
-		UE_LOG(LogTemp, Warning, TEXT("i have secondary weapon! should make that my current"));
-	}
-	else {
-		CurrentWeapon = nullptr;
-
-		if (!SecondaryInHand && PrimaryWeapon)
-		{
-			AttachToHand(PrimaryWeapon);
-		}
-		else {
-			CurrentWeapon = nullptr;
-		}
-	}
-}
 
 void AMannequin::SpawnAndAttachWeapon(UClass* SpawnClass)
 {
 	if (SpawnClass == NULL) { UE_LOG(LogTemp, Warning, TEXT("NO CurrentWeapon GIVEN TO : %s"), *GetName()); return; }
-	/*If Possible if CurrentWeapon is SET*/
-	//Drop();
+	if (CurrentWeapon)
+	{
+		if (SpawnClass == CurrentWeapon->GetClass() || (PrimaryWeapon && SecondaryWeapon))
+		{
+			Drop();
+		}
+	}
+	
 	SpawningClass = SpawnClass;
 
 	FTimerHandle QuickHandle;
@@ -267,10 +187,11 @@ void AMannequin::SpawnAndAttachWeapon(UClass* SpawnClass)
 void AMannequin::SpawnAndAttach()
 {
 	if (!ensure(SpawningClass)) { return; }
+
 	FActorSpawnParameters SpawnParams;
 	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 	AWeaponBase* SpawnedWeapon = GetWorld()->SpawnActor<AWeaponBase>(SpawningClass, GetActorTransform(), SpawnParams);
-
+	
 	SpawnedWeapon->SetOwner(this);
 	canFire = true;
 
@@ -323,23 +244,33 @@ void AMannequin::AttachToBack(AWeaponBase* Weapon)
 		Weapon->AttachToComponent(GetMesh(), FAttachmentTransformRules::SnapToTargetNotIncludingScale, Weapon->WeaponInfo.SecondaryBack);
 	}
 
-	bUseControllerRotationYaw = false;
-	WeaponCombat = false;
-
+	
 	if (Weapon->WeaponInfo.WeaponClass == EWeaponClass::PrimaryWeapon)
 		PrimaryInHand = false;
 	if (Weapon->WeaponInfo.WeaponClass == EWeaponClass::SecondaryWeapon)
 		SecondaryInHand = false;
+
+	if(PrimaryInHand|| SecondaryInHand)
+	{ 
+		WeaponCombat = true;
+		bUseControllerRotationYaw = true;
+	}
+	else {
+		WeaponCombat = false;
+		bUseControllerRotationYaw = false;
+	}
 }
 void AMannequin::SetAndAttach(AWeaponBase* Weapon)
 {
 	Weapon->TurnOfAll();
-	Weapon->AnimInstance1P = FP_ArmMesh->GetAnimInstance();
-	Weapon->AnimInstance3P = GetMesh()->GetAnimInstance();
+	Weapon->SetAnimInstances(FP_ArmMesh->GetAnimInstance(), GetMesh()->GetAnimInstance());
+
+	/*	Weapon->AnimInstance1P = FP_ArmMesh->GetAnimInstance();
+		Weapon->AnimInstance3P = GetMesh()->GetAnimInstance();*/
 
 	if (Weapon->WeaponInfo.WeaponClass == EWeaponClass::PrimaryWeapon)
 	{
-		if (SecondaryInHand)
+		/*if (SecondaryInHand)
 		{
 			if (PickupAttachDirect)
 			{
@@ -362,10 +293,11 @@ void AMannequin::SetAndAttach(AWeaponBase* Weapon)
 		}
 		else {
 			AttachToHand(Weapon);
-		}
+		}*/PrimaryEquip();
+	
 	}
 	else {
-		if (PrimaryInHand)
+		/*if (PrimaryInHand)
 		{
 			if (PickupAttachDirect)
 			{
@@ -389,8 +321,8 @@ void AMannequin::SetAndAttach(AWeaponBase* Weapon)
 		else {
 			AttachToHand(Weapon);
 		}
+	*/SecondaryEquip();
 	}
-	
 }
 
 void AMannequin::AttachNadeToHand(AActor* ActorToAttach)
@@ -480,14 +412,105 @@ void AMannequin::AttachNadeToBack(AActor* ActorToAttach)
 	}
 }
 
+void AMannequin::Drop()
+{
+	if (CurrentWeapon == nullptr) { return; }
+
+	if (PrimaryInHand)
+	{
+		if (!isFiring)
+		{
+			CurrentWeapon->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
+
+			float ThrowSpeed;
+			if ((GetVelocity().Size()*2.5f) < 200)
+			{
+				ThrowSpeed = 500.f;
+			}
+			else {
+				ThrowSpeed = (GetVelocity().Size()*2.5f);
+			}
+			UCameraComponent* CameraToUse = IsFirstPerson ? FP_Camera : TP_Camera;
+			FVector MadeVelocity = ((CameraToUse->GetForwardVector()*ThrowSpeed) + (CameraToUse->GetUpVector() * 300)) * ThrowMultiplier;
+			CurrentWeapon->GetProjectileMovementComp()->Velocity = MadeVelocity;
+			CurrentWeapon->GetProjectileMovementComp()->Activate();
+
+			FTimerHandle HandleDrop;
+			GetWorldTimerManager().SetTimer(HandleDrop, this, &AMannequin::DropSec, 0.05f, false);
+
+			bUseControllerRotationYaw = false;
+			canFire = false;
+			PrimaryInHand = false;
+			WeaponCombat = false;
+			PrimaryWeapon = nullptr;
+		}
+	}
+	else {
+		if (!isFiring)
+		{
+			CurrentWeapon->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
+
+			float ThrowSpeed;
+			if ((GetVelocity().Size()*2.5f) < 200)
+			{
+				ThrowSpeed = 500.f;
+			}
+			else {
+				ThrowSpeed = (GetVelocity().Size()*2.5f);
+			}
+			UCameraComponent* CameraToUse = IsFirstPerson ? FP_Camera : TP_Camera;
+			FVector MadeVelocity = ((CameraToUse->GetForwardVector()*ThrowSpeed) + (CameraToUse->GetUpVector() * 300)) * ThrowMultiplier;
+			CurrentWeapon->GetProjectileMovementComp()->Velocity = MadeVelocity;
+			CurrentWeapon->GetProjectileMovementComp()->Activate();
+
+			FTimerHandle HandleDrop;
+			GetWorldTimerManager().SetTimer(HandleDrop, this, &AMannequin::DropSec, 0.05f, false);
+
+			bUseControllerRotationYaw = false;
+			canFire = false;
+			SecondaryInHand = false;
+			WeaponCombat = false;
+			SecondaryWeapon = nullptr;
+		}
+	}
+}
+void AMannequin::DropSec()
+{
+	CurrentWeapon->EnableAll();
+
+	if (!PrimaryInHand && SecondaryWeapon)
+	{
+		AttachToHand(SecondaryWeapon);
+		UE_LOG(LogTemp, Warning, TEXT("i have secondary weapon! should make that my current"));
+	}
+	else {
+		CurrentWeapon = nullptr;
+
+		if (!SecondaryInHand && PrimaryWeapon)
+		{
+			AttachToHand(PrimaryWeapon);
+		}
+		else {
+			CurrentWeapon = nullptr;
+		}
+	}
+}
+
 void AMannequin::PrimaryEquip()
 {
 	if (PrimaryWeapon== nullptr) { return; }
 
 	if (SecondaryInHand)
 	{
-		AttachToBack(SecondaryWeapon);
-		AttachToHand(PrimaryWeapon);
+		if (PickupAttachDirect)
+		{
+			AttachToBack(SecondaryWeapon);
+			AttachToHand(PrimaryWeapon);
+		}
+		else {
+			AttachToBack(PrimaryWeapon);
+		}
+		
 	}
 	else if (NadeInHand)
 		{
@@ -509,8 +532,14 @@ void AMannequin::SecondaryEquip()
 
 	if (PrimaryInHand)
 	{
-		AttachToBack(PrimaryWeapon);
-		AttachToHand(SecondaryWeapon);
+		if (PickupAttachDirect)
+		{
+			AttachToBack(PrimaryWeapon);
+			AttachToHand(SecondaryWeapon);
+		}
+		else {
+			AttachToBack(SecondaryWeapon);
+		}
 	}
 	else if (NadeInHand)
 	{
@@ -583,7 +612,6 @@ void AMannequin::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent
 {
 	Super::SetupPlayerInputComponent(PlayerInputComponent);
 }
-
 void AMannequin::UnPossessed()
 {
 	Super::UnPossessed();
@@ -600,7 +628,6 @@ void AMannequin::PullTrigger()
 }
 void AMannequin::StartFire()
 {
-
 	if (NadeInHand)
 	{
 		Nade->ThrowNade();
@@ -620,6 +647,17 @@ void AMannequin::EndFire()
 	}
 }
 
+void AMannequin::SetCanPickup(bool boolcanpickup)
+{
+	CanPickup = boolcanpickup;
+}
+void AMannequin::SetNadeThrown(UAnimMontage* NadeBasePose)
+{
+	GetMesh()->GetAnimInstance()->Montage_Stop(0.05f, NadeBasePose);
+	bUseControllerRotationYaw = false;;
+	NadeInHand = false;
+	Nade = nullptr;
+}
 void AMannequin::GetWeapons(AWeaponBase*& CurrentWeaponOut, AWeaponBase*& PrimaryWeaponOut, AWeaponBase*& SecondaryWeaponOut, ANadeActor*& NadeOut, AMeleeActor*& MeleeOut)
 {
 	if (CurrentWeapon)
@@ -633,4 +671,15 @@ void AMannequin::GetWeapons(AWeaponBase*& CurrentWeaponOut, AWeaponBase*& Primar
 	if (Melee)
 		MeleeOut = Melee;
 }
-
+UCameraComponent* AMannequin::GetUsedCamera()
+{
+	return IsFirstPerson ? FP_Camera : TP_Camera;
+}
+bool AMannequin::GetWeaponCombat()
+{
+	return WeaponCombat;
+}
+bool AMannequin::GetIsFirstPerson()
+{
+	return IsFirstPerson;
+}

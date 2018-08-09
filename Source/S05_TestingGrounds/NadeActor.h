@@ -49,6 +49,13 @@ public:
 	class UTexture* ImageUI;
 };
 
+class UStaticMeshComponent;
+class USphereComponent;
+class URadialForceComponent;
+class UProjectileMovementComponent;
+
+class AMannequin;
+
 UCLASS()
 class S05_TESTINGGROUNDS_API ANadeActor : public AActor
 {
@@ -62,8 +69,6 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FNadeInfo NadeInfo;
-
-	class UAnimInstance* AnimInstance;
 
 	void ThrowNade();
 
@@ -79,21 +84,18 @@ protected:
 
 	void ThrowSec();
 	
-	FVector ExplodeLocation;
-	bool DidHit;
+	UPROPERTY(VisibleAnywhere)
+	UStaticMeshComponent* NadeMesh;
+	
+	UPROPERTY(VisibleAnywhere)
+	USphereComponent* SphereComp;
+	
+	UPROPERTY(VisibleAnywhere)
+	URadialForceComponent* RadialForceComp;
+	
+	UPROPERTY(VisibleAnywhere)
+	UProjectileMovementComponent* ProjectileMovementComponent;
 
-	UPROPERTY(VisibleAnywhere)
-	class UStaticMeshComponent* NadeMesh;
-	
-	UPROPERTY(VisibleAnywhere)
-	class USphereComponent* SphereComp;
-	
-	UPROPERTY(VisibleAnywhere)
-	class URadialForceComponent* RadialForceComp;
-	
-	UPROPERTY(VisibleAnywhere)
-	class UProjectileMovementComponent* ProjectileMovementComponent;
-
-	class AMannequin* PlayerCharacter;
+	AMannequin* PlayerCharacter;
 	
 };

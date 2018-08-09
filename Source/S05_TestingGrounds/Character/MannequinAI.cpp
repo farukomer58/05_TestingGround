@@ -123,14 +123,10 @@ void AMannequinAI::TryPickup()
 		{
 			if (Cast<AWeaponBase>(HitResult.GetActor()))
 			{
-				UE_LOG(LogTemp, Error, TEXT("You can pickup: %s"), *HitResult.GetActor()->GetName());
+				//UE_LOG(LogTemp, Error, TEXT("You can pickup: %s"), *HitResult.GetActor()->GetName());
 				Pickup(HitResult.GetActor());
 			}
-			else {
-				UE_LOG(LogTemp, Warning, TEXT("You can NOT pickup: %s"), *HitResult.GetActor()->GetName());
-			}
 		}
-
 	}
 }
 void AMannequinAI::Drop()
@@ -151,8 +147,8 @@ void AMannequinAI::Drop()
 			}
 			UCameraComponent* CameraToUse = IsFirstPerson ? FP_Camera : TP_Camera;
 			FVector MadeVelocity = ((CameraToUse->GetForwardVector()*ThrowSpeed) + (CameraToUse->GetUpVector() * 300)) * ThrowMultiplier;
-			CurrentWeapon->ProjectileMovementComponent->Velocity = MadeVelocity;
-			CurrentWeapon->ProjectileMovementComponent->Activate();
+			CurrentWeapon->GetProjectileMovementComp()->Velocity = MadeVelocity;
+			CurrentWeapon->GetProjectileMovementComp()->Activate();
 
 			FTimerHandle HandleDrop;
 			GetWorldTimerManager().SetTimer(HandleDrop, this, &AMannequinAI::DropSec, 0.05f, false);
@@ -195,8 +191,9 @@ void AMannequinAI::SpawnAndAttach()
 		CurrentWeapon->AttachToComponent(GetMesh(), FAttachmentTransformRules::SnapToTargetIncludingScale, CurrentWeapon->WeaponInfo.SocketName3P);
 	}
 
-	CurrentWeapon->AnimInstance1P = FP_ArmMesh->GetAnimInstance();
-	CurrentWeapon->AnimInstance3P = GetMesh()->GetAnimInstance();
+	CurrentWeapon->SetAnimInstances(FP_ArmMesh->GetAnimInstance(), GetMesh()->GetAnimInstance());
+/*	CurrentWeapon->AnimInstance1P = FP_ArmMesh->GetAnimInstance();
+	CurrentWeapon->AnimInstance3P = GetMesh()->GetAnimInstance();*/
 }
 
 // Called every frame

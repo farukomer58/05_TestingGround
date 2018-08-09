@@ -7,6 +7,13 @@
 #include "Mannequin.generated.h"
 
 class USkeletalMeshComponent;
+class UCameraComponent;
+class USpringArmComponent;
+class UAnimMontage;
+
+class AWeaponBase;
+class ANadeActor;
+class AMeleeActor;
 
 UCLASS()
 class S05_TESTINGGROUNDS_API AMannequin : public ACharacter
@@ -32,51 +39,56 @@ public:
 
 	void SwitchCamPosition();
 
-	UPROPERTY(EditDefaultsOnly,BlueprintReadWrite)
-	bool IsFirstPerson;
+	void SetCanPickup(bool boolcanpickup);
 
-	bool CanPickup = true;
-
-	UPROPERTY(VisibleAnywhere, meta = (AllowPrivateAccess = "true"))
-	class UCameraComponent* FP_Camera;
-
-	UPROPERTY(VisibleAnywhere, meta = (AllowPrivateAccess = "true"))
-	class USpringArmComponent* Spring_Arm;
-
-	UPROPERTY(VisibleAnywhere, meta = (AllowPrivateAccess = "true"))
-	class UCameraComponent* TP_Camera;
-
-	UPROPERTY(EditDefaultsOnly, meta = (EditCondition = "SpawnFromClass"))
-	TSubclassOf<class AWeaponBase> GunActor;
-	UPROPERTY(EditDefaultsOnly)
-	TSubclassOf<class ANadeActor> NadeActor;
-	UPROPERTY(EditDefaultsOnly)
-	TSubclassOf<class AMeleeActor> MeleeActor;
+	void SetNadeThrown(UAnimMontage* NadeBasePose);
 
 	UFUNCTION(BlueprintCallable, BlueprintPure)
 	void GetWeapons(AWeaponBase*& CurrentWeaponOut, AWeaponBase*& PrimaryWeaponOut, AWeaponBase*& SecondaryWeaponOut, ANadeActor*& NadeOut, AMeleeActor*& MeleeOut);
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
-	bool WeaponCombat;
+	UFUNCTION(BlueprintCallable, BlueprintPure)
+	bool GetWeaponCombat();
+	
+	bool GetIsFirstPerson();
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
-		bool PrimaryInHand;
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
-		bool SecondaryInHand;
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
-		bool MeleeInHand;
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
-		bool NadeInHand;
-
-	UPROPERTY(VisibleAnywhere)
-		ANadeActor* Nade;
+	UCameraComponent* GetUsedCamera();
 
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
+	bool IsFirstPerson;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	bool PrimaryInHand;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	bool SecondaryInHand;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	bool MeleeInHand;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	bool NadeInHand;
+	UPROPERTY(VisibleAnywhere)
+	bool WeaponCombat;
+
+	UPROPERTY(EditDefaultsOnly, meta = (EditCondition = "SpawnFromClass"))
+	TSubclassOf<AWeaponBase> GunActor;
+	UPROPERTY(EditDefaultsOnly)
+	TSubclassOf<ANadeActor> NadeActor;
+	UPROPERTY(EditDefaultsOnly)
+	TSubclassOf<AMeleeActor> MeleeActor;
+
 	UPROPERTY(VisibleAnywhere)
 	USkeletalMeshComponent* FP_ArmMesh;
+
+	UPROPERTY(VisibleAnywhere, meta = (AllowPrivateAccess = "true"))
+	UCameraComponent* FP_Camera;
+
+	UPROPERTY(VisibleAnywhere, meta = (AllowPrivateAccess = "true"))
+	USpringArmComponent* Spring_Arm;
+
+	UPROPERTY(VisibleAnywhere, meta = (AllowPrivateAccess = "true"))
+	UCameraComponent* TP_Camera;
 
 private:
 	
@@ -121,11 +133,14 @@ private:
 
 	UPROPERTY(EditDefaultsOnly)
 	bool PickupAttachDirect;
-	
+
+	bool CanPickup = true;
+
 	bool canFire = true;
 	bool isFiring;
 
-	
+	UPROPERTY(VisibleAnywhere)
+	ANadeActor* Nade;
 	UPROPERTY(VisibleAnywhere)
 	AMeleeActor* Melee;
 	UPROPERTY(VisibleAnywhere)

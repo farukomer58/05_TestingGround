@@ -4,7 +4,6 @@
 
 #include "BallProjectile.h"
 #include "../Character/Mannequin.h"
-
 #include "Components/SkeletalMeshComponent.h"
 #include "Components/SphereComponent.h"
 #include "Components/CapsuleComponent.h"
@@ -27,12 +26,10 @@ AWeaponBase::AWeaponBase()
 	GunMesh = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("GunMesh"));
 	GunMesh->bCastDynamicShadow = false;
 	GunMesh->CastShadow = false;
-	// GunMesh->SetupAttachment(Mesh1P, TEXT("GripPoint"));
 	SetRootComponent(GunMesh);
 	GunMesh->SetCollisionResponseToChannel(ECC_Visibility, ECR_Block);
 	GunMesh->SetCollisionResponseToChannel(ECC_GameTraceChannel3, ECR_Ignore);
 	GunMesh->SetCollisionResponseToChannel(ECC_Camera, ECR_Ignore);
-	//GunMesh->SetupAttachment(RootComponent);
 
 	InnerSphereCollision = CreateDefaultSubobject<UCapsuleComponent>(TEXT("InnerSphereCollision"));
 	InnerSphereCollision->SetupAttachment(GunMesh);
@@ -60,14 +57,17 @@ void AWeaponBase::BeginPlay()
 	GunMesh->SetSimulatePhysics(true);
 	ProjectileMovementComponent->Deactivate();
 
-	PlayerCharacter = Cast<AMannequin>(UGameplayStatics::GetPlayerCharacter(GetWorld(),0));
+	//PlayerCharacter = Cast<AMannequin>(GetOwner());
+	PlayerCharacter = Cast<AMannequin>(UGameplayStatics::GetPlayerCharacter(GetWorld(), 0));
+
+
 }
 void AWeaponBase::OnOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
 {
 	if (OtherActor == PlayerCharacter)
 	{
 		CanPickup = true;
-		PlayerCharacter->CanPickup = CanPickup;
+		PlayerCharacter->SetCanPickup(CanPickup);
 		GunMesh->SetRenderCustomDepth(true);
 		EnableInput(GetWorld()->GetFirstPlayerController());
 	}
@@ -77,7 +77,7 @@ void AWeaponBase::OnEndOverlap(UPrimitiveComponent* OverlappedComponent, AActor*
 	if (OtherActor == PlayerCharacter)
 	{
 		CanPickup = false;
-		PlayerCharacter->CanPickup = CanPickup;
+		PlayerCharacter->SetCanPickup(CanPickup);
 		GunMesh->SetRenderCustomDepth(false);
 		EnableInput(GetWorld()->GetFirstPlayerController());
 	}
@@ -234,10 +234,9 @@ void AWeaponBase::PlayFireEffects(FVector TracerEndPoint)
 		AnimInstance3P->Montage_Play(WeaponInfo.FireAnimation3P, 1.f);
 	}
 }
-
 void AWeaponBase::CalculateStartAndEnd(FVector& Start, FVector& End)
 {
-	Start = GetCamera()->GetComponentLocation();
+	Start = PlayerCharacter->GetUsedCamera()->GetComponentLocation();
 	FVector PlayerVelocity = PlayerCharacter->GetVelocity();
 	float PlayerVelocityClamped = (ClampVector(PlayerVelocity, FVector(0), FVector(1))).Size();
 	FVector FinalSpray = FVector(
@@ -245,17 +244,16 @@ void AWeaponBase::CalculateStartAndEnd(FVector& Start, FVector& End)
 		(FMath::RandRange(-WeaponInfo.SprayRange, WeaponInfo.SprayRange)*PlayerVelocityClamped),
 		(FMath::RandRange(-WeaponInfo.SprayRange, WeaponInfo.SprayRange)*PlayerVelocityClamped)
 	);
-	End = (GetCamera()->GetForwardVector() * 9999) + Start + FinalSpray;
+	End = (PlayerCharacter->GetUsedCamera()->GetForwardVector() * 9999) + Start + FinalSpray;
 }
-UCameraComponent* AWeaponBase::GetCamera()
+
+void AWeaponBase::SetAnimInstances(UAnimInstance* SettedAnimInstance1P, UAnimInstance* SettedAnimInstance3P)
 {
-	if (PlayerCharacter->IsFirstPerson)
-	{
-		return PlayerCharacter->FP_Camera;
-	}
-	else {
-		return PlayerCharacter->TP_Camera;
-	}
+	AnimInstance1P = SettedAnimInstance1P;
+	AnimInstance3P = SettedAnimInstance3P;
 }
 
-
+UProjectileMovementComponent* AWeaponBase::GetProjectileMovementComp()
+{
+	return ProjectileMovementComponent;
+}

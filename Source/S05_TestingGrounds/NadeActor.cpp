@@ -8,7 +8,6 @@
 #include "Camera/CameraComponent.h"
 #include "TimerManager.h"
 #include "Character/Mannequin.h"
-#include "Animation/AnimInstance.h"
 #include "Kismet/GameplayStatics.h"
 
 
@@ -66,7 +65,7 @@ void ANadeActor::ThrowNade()
 	{
 		PlayerCharacter = Cast<AMannequin>(MyOwner);
 
-		UCameraComponent* CameraToUse = PlayerCharacter->IsFirstPerson ? PlayerCharacter->FP_Camera : PlayerCharacter->TP_Camera;
+		UCameraComponent* CameraToUse = PlayerCharacter->GetUsedCamera();
 		DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
 
 		FVector MadeVelocity = ((CameraToUse->GetForwardVector()*NadeInfo.ThrowSpeed) + (CameraToUse->GetUpVector() * FMath::RandRange(200.f, 350.f)));
@@ -83,18 +82,14 @@ void ANadeActor::ThrowNade()
 void ANadeActor::ThrowSec()
 {
 	SphereComp->SetSimulatePhysics(true);
-	
-	AnimInstance->Montage_Stop(0.05f, NadeInfo.NadeBasePose);
-	PlayerCharacter->bUseControllerRotationYaw = false;;
-	PlayerCharacter->NadeInHand = false;
-	PlayerCharacter->Nade = nullptr;
-
 	ProjectileMovementComponent->Deactivate();
+
+	PlayerCharacter->SetNadeThrown(NadeInfo.NadeBasePose);
+
 }
 // Called every frame
 void ANadeActor::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
-
 }
 

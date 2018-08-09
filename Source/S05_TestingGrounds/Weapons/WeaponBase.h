@@ -84,6 +84,14 @@ public:
 	class UTexture* ImageUI;
 };
 
+class UAnimInstance;
+class UProjectileMovementComponent;
+class USphereComponent;
+class UCapsuleComponent;
+class USkeletalMeshComponent;
+
+class AMannequin;
+
 UCLASS()
 class S05_TESTINGGROUNDS_API AWeaponBase : public AActor
 {
@@ -107,11 +115,9 @@ public:
 	void TurnOfAll();
 	void EnableAll();
 
-	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = Mesh)
-	class UProjectileMovementComponent* ProjectileMovementComponent;
+	void SetAnimInstances(UAnimInstance* SettedAnimInstance1P, UAnimInstance* SettedAnimInstance3P);
 
-	class UAnimInstance* AnimInstance1P;
-	class UAnimInstance* AnimInstance3P;
+	UProjectileMovementComponent* GetProjectileMovementComp();
 
 	UPROPERTY(EditDefaultsOnly)
 	FAddController AddController;
@@ -119,22 +125,26 @@ public:
 	UPROPERTY(EditAnywhere,BlueprintReadWrite)
 	FWeaponInfo WeaponInfo;
 protected:
-	void PlayFireEffects(FVector TracerEndPoint);
-
+	
 	float LastFireTime;
-
 	FTimerHandle TimerHandle_Fire;
+
+	UAnimInstance* AnimInstance1P;
+	UAnimInstance* AnimInstance3P;
 
 	/** Gun mesh: 1st person view (seen only by self) */
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = Mesh)
-	class USkeletalMeshComponent* GunMesh;
+	USkeletalMeshComponent* GunMesh;
 
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = Mesh)
-	class UCapsuleComponent* InnerSphereCollision;
+	UCapsuleComponent* InnerSphereCollision;
 
 	/** Location on gun mesh where projectiles should spawn. */
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = Mesh)
-	class USphereComponent* SphereCollision;
+	USphereComponent* SphereCollision;
+
+	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = Mesh)
+	UProjectileMovementComponent* ProjectileMovementComponent;
 
 private:
 	UFUNCTION()
@@ -142,12 +152,12 @@ private:
 	UFUNCTION()
 	void OnEndOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex);
 
-	void CalculateStartAndEnd(FVector& Start, FVector& End);
+	void PlayFireEffects(FVector TracerEndPoint);
 
-	class UCameraComponent* GetCamera();
+	void CalculateStartAndEnd(FVector& Start, FVector& End);
 
 	bool CanPickup = true;
 
-	class AMannequin* PlayerCharacter = nullptr;
+	AMannequin* PlayerCharacter = nullptr;
 
 };
