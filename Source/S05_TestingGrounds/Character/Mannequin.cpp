@@ -55,15 +55,19 @@ void AMannequin::BeginPlay()
 	{
 		SpawnAndAttachWeapon(GunActor);
 	}
-
-	Nade = GetWorld()->SpawnActor<ANadeActor>(NadeActor);
-	Nade->SetOwner(this);
-	AttachNadeToBack(Nade);
-
-	Melee = GetWorld()->SpawnActor<AMeleeActor>(MeleeActor);
-	Melee->SetOwner(this);
-	AttachNadeToBack(Melee);
-
+	if (NadeActor)
+	{
+		Nade = GetWorld()->SpawnActor<ANadeActor>(NadeActor);
+		Nade->SetOwner(this);
+		Nade->AnimInstance = GetMesh()->GetAnimInstance();
+		AttachNadeToBack(Nade);
+	}
+	if (MeleeActor)
+	{
+		Melee = GetWorld()->SpawnActor<AMeleeActor>(MeleeActor);
+		Melee->SetOwner(this);
+		AttachNadeToBack(Melee);
+	}
 	if (InputComponent != NULL)
 	{
 		InputComponent->BindAction("Fire", IE_Pressed, this, &AMannequin::StartFire);
@@ -105,6 +109,7 @@ void AMannequin::SwitchCamPosition()
 		TP_Camera->SetActive(true);
 		Spring_Arm->bUsePawnControlRotation = true;
 		SpawnTraceLengthTP = 600.f;
+		bUseControllerRotationYaw = false;
 
 		AttachToHand(CurrentWeapon);
 		if (NadeInHand)
@@ -190,8 +195,11 @@ void AMannequin::Drop()
 
 			FTimerHandle HandleDrop;
 			GetWorldTimerManager().SetTimer(HandleDrop, this, &AMannequin::DropSec, 0.05f, false);
+			
+			bUseControllerRotationYaw = false;
 			canFire = false;
 			PrimaryInHand = false;
+			WeaponCombat = false;
 			PrimaryWeapon = nullptr;
 		}
 	}
@@ -215,8 +223,11 @@ void AMannequin::Drop()
 
 			FTimerHandle HandleDrop;
 			GetWorldTimerManager().SetTimer(HandleDrop, this, &AMannequin::DropSec, 0.05f, false);
+			
+			bUseControllerRotationYaw = false;
 			canFire = false;
 			SecondaryInHand = false;
+			WeaponCombat = false;
 			SecondaryWeapon = nullptr;
 		}
 	}
@@ -291,6 +302,9 @@ void AMannequin::AttachToHand(AWeaponBase* Weapon)
 		Weapon->AttachToComponent(GetMesh(), FAttachmentTransformRules::SnapToTargetNotIncludingScale, Weapon->WeaponInfo.SocketName3P);
 	}
 
+	bUseControllerRotationYaw = true;
+	WeaponCombat = true;
+
 	if(Weapon->WeaponInfo.WeaponClass==EWeaponClass::PrimaryWeapon)
 		PrimaryInHand = true;
 	if (Weapon->WeaponInfo.WeaponClass == EWeaponClass::SecondaryWeapon)
@@ -308,6 +322,9 @@ void AMannequin::AttachToBack(AWeaponBase* Weapon)
 	{
 		Weapon->AttachToComponent(GetMesh(), FAttachmentTransformRules::SnapToTargetNotIncludingScale, Weapon->WeaponInfo.SecondaryBack);
 	}
+
+	bUseControllerRotationYaw = false;
+	WeaponCombat = false;
 
 	if (Weapon->WeaponInfo.WeaponClass == EWeaponClass::PrimaryWeapon)
 		PrimaryInHand = false;
@@ -391,8 +408,17 @@ void AMannequin::AttachNadeToHand(AActor* ActorToAttach)
 		{
 			ActorToAttach->AttachToComponent(GetMesh(), FAttachmentTransformRules::SnapToTargetNotIncludingScale, CastNade->NadeInfo.SocketName3P);
 		}
+
+		bUseControllerRotationYaw = true;
 		NadeInHand = true;
-		PlayAnimMontage(Nade->NadeInfo.ThrowPosition);
+		WeaponCombat = false;
+		CurrentWeapon = nullptr;
+		if (Melee)
+		{
+			GetMesh()->GetAnimInstance()->Montage_IsPlaying(Melee->MeleeInfo.MeleeBasePose);
+			GetMesh()->GetAnimInstance()->Montage_Stop(0.05f,Melee->MeleeInfo.MeleeBasePose);
+		}
+		GetMesh()->GetAnimInstance()->Montage_Play(Nade->NadeInfo.NadeBasePose);
 	}
 	else {
 		AMeleeActor* CastMelee = Cast<AMeleeActor>(ActorToAttach);
@@ -406,10 +432,22 @@ void AMannequin::AttachNadeToHand(AActor* ActorToAttach)
 			{
 				ActorToAttach->AttachToComponent(GetMesh(), FAttachmentTransformRules::SnapToTargetNotIncludingScale, CastMelee->MeleeInfo.SocketName3P);
 			}
+
+			bUseControllerRotationYaw = true;
 			MeleeInHand = true;
+			WeaponCombat = false;
+			CurrentWeapon = nullptr;
+
+			if (Nade)
+			{
+				GetMesh()->GetAnimInstance()->Montage_IsPlaying(Nade->NadeInfo.NadeBasePose);
+				GetMesh()->GetAnimInstance()->Montage_Stop(0.05f, Nade->NadeInfo.NadeBasePose);
+			}
+
+			GetMesh()->GetAnimInstance()->Montage_Play(Melee->MeleeInfo.MeleeBasePose);
+
 		}
 	}
-
 
 }
 void AMannequin::AttachNadeToBack(AActor* ActorToAttach)
@@ -420,7 +458,11 @@ void AMannequin::AttachNadeToBack(AActor* ActorToAttach)
 	if (CastNade)
 	{
 		ActorToAttach->AttachToComponent(GetMesh(), FAttachmentTransformRules::SnapToTargetNotIncludingScale, CastNade->NadeInfo.NadeBackSocket);
+	
+		bUseControllerRotationYaw = false;
 		NadeInHand = false;
+
+		GetMesh()->GetAnimInstance()->Montage_Stop(0.05f, CastNade->NadeInfo.NadeBasePose);
 	}
 	else
 	{
@@ -429,7 +471,11 @@ void AMannequin::AttachNadeToBack(AActor* ActorToAttach)
 		{
 			ActorToAttach->AttachToComponent(GetMesh(), FAttachmentTransformRules::SnapToTargetNotIncludingScale, CastMelee->MeleeInfo.MeleeBackSocket);
 			
+			bUseControllerRotationYaw = false;
 			MeleeInHand = false;
+
+			GetMesh()->GetAnimInstance()->Montage_Stop(0.05f, CastMelee->MeleeInfo.MeleeBasePose);
+
 		}
 	}
 }

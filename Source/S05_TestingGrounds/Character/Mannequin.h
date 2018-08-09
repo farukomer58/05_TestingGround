@@ -6,6 +6,8 @@
 #include "GameFramework/Character.h"
 #include "Mannequin.generated.h"
 
+class USkeletalMeshComponent;
+
 UCLASS()
 class S05_TESTINGGROUNDS_API AMannequin : public ACharacter
 {
@@ -55,6 +57,9 @@ public:
 	void GetWeapons(AWeaponBase*& CurrentWeaponOut, AWeaponBase*& PrimaryWeaponOut, AWeaponBase*& SecondaryWeaponOut, ANadeActor*& NadeOut, AMeleeActor*& MeleeOut);
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	bool WeaponCombat;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
 		bool PrimaryInHand;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
 		bool SecondaryInHand;
@@ -71,7 +76,7 @@ protected:
 	virtual void BeginPlay() override;
 
 	UPROPERTY(VisibleAnywhere)
-	class USkeletalMeshComponent* FP_ArmMesh;
+	USkeletalMeshComponent* FP_ArmMesh;
 
 private:
 	

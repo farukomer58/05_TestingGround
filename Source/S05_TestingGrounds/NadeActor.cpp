@@ -8,6 +8,8 @@
 #include "Camera/CameraComponent.h"
 #include "TimerManager.h"
 #include "Character/Mannequin.h"
+#include "Animation/AnimInstance.h"
+#include "Kismet/GameplayStatics.h"
 
 
 // Sets default values
@@ -16,13 +18,17 @@ ANadeActor::ANadeActor()
  	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = true;
 
-	NadeMesh = CreateDefaultSubobject<UStaticMeshComponent>("NadeMesh");
-	RootComponent = NadeMesh;
+	SphereComp = CreateDefaultSubobject<USphereComponent>("SphereComp");
+	SphereComp->SetSphereRadius(15.f);
+	RootComponent = SphereComp;
 
-	SphereComp= CreateDefaultSubobject<USphereComponent>("SphereComp");
-	SphereComp->SetupAttachment(RootComponent);
+	NadeMesh = CreateDefaultSubobject<UStaticMeshComponent>("NadeMesh");
+	NadeMesh->SetupAttachment(RootComponent);
 
 	RadialForceComp= CreateDefaultSubobject<URadialForceComponent>("RadialForceComp");
+	RadialForceComp->Radius = 250.f;
+	RadialForceComp->ImpulseStrength= 3000.f;
+	RadialForceComp->bImpulseVelChange = true;
 	RadialForceComp->SetupAttachment(RootComponent);
 
 	ProjectileMovementComponent= CreateDefaultSubobject<UProjectileMovementComponent>("ProjectileMovementComponent");
@@ -34,7 +40,24 @@ void ANadeActor::BeginPlay()
 	Super::BeginPlay();
 
 	ProjectileMovementComponent->Deactivate();
-	NadeMesh->SetSimulatePhysics(false);
+	SphereComp->SetSimulatePhysics(false);
+}
+/*void ANadeActor::OnHit(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult & SweepResult)
+{
+	UE_LOG(LogTemp, Error, TEXT("NADE OVERLAPPPED : %s & Nade Actor Overlap: %s!!"), *OtherComp->GetName(),*OtherActor->GetName());
+	if (OtherActor == GetOwner() || OtherActor == this) { return; }
+	FTimerHandle OnHitHandle;
+	GetWorldTimerManager().SetTimer(OnHitHandle, this, &ANadeActor::Explode, NadeInfo.HitTimerSeconds, false);
+}*/
+void ANadeActor::Explode()
+{
+	UE_LOG(LogTemp, Warning, TEXT("Explode () is called!!"));
+
+	UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), NadeInfo.ExplosionEffect, GetActorLocation(), FRotator());
+	UGameplayStatics::PlaySoundAtLocation(this, NadeInfo.ExplosionSound, GetActorLocation());
+	RadialForceComp->FireImpulse();
+
+	Destroy();
 }
 void ANadeActor::ThrowNade()
 {
@@ -50,19 +73,24 @@ void ANadeActor::ThrowNade()
 		ProjectileMovementComponent->Velocity = MadeVelocity;
 		ProjectileMovementComponent->Activate();
 
-		
 		FTimerHandle Handle;
-		GetWorldTimerManager().SetTimer(Handle, this, &ANadeActor::ThrowSec, 0.05f, false, 0.f);
+		GetWorldTimerManager().SetTimer(Handle, this, &ANadeActor::ThrowSec, 0.05f, false);
+
+		FTimerHandle LifeSpanHandle;
+		GetWorldTimerManager().SetTimer(LifeSpanHandle, this, &ANadeActor::Explode, NadeInfo.LifeSpanSeconds, false);
 	}
 }
 void ANadeActor::ThrowSec()
 {
-	NadeMesh->SetSimulatePhysics(true);
+	SphereComp->SetSimulatePhysics(true);
+	
+	AnimInstance->Montage_Stop(0.05f, NadeInfo.NadeBasePose);
+	PlayerCharacter->bUseControllerRotationYaw = false;;
 	PlayerCharacter->NadeInHand = false;
 	PlayerCharacter->Nade = nullptr;
+
+	ProjectileMovementComponent->Deactivate();
 }
-
-
 // Called every frame
 void ANadeActor::Tick(float DeltaTime)
 {

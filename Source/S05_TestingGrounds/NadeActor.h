@@ -13,9 +13,9 @@ struct FNadeInfo
 
 public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
-	float CurrentAmmount = 100.f;
+	float LifeSpanSeconds = 10.f;
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
-	float Damage = 50.f;;
+	float Damage = 50.f;
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
 	float ThrowSpeed = 2000.f;
 
@@ -25,14 +25,17 @@ public:
 	FName SocketName3P;
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
 	FName NadeBackSocket;
-	
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Gameplay)
+	class UParticleSystem* ExplosionEffect;
+
 	/** Sound to play each time we fire */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Gameplay)
 	class USoundBase* ExplosionSound;
 
 	/** AnimMontage to play each time we fire */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Gameplay)
-		class UAnimMontage* ThrowPosition;
+	class UAnimMontage* NadeBasePose;
 
 	/** AnimMontage to play each time we fire */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Gameplay)
@@ -60,14 +63,25 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FNadeInfo NadeInfo;
 
+	class UAnimInstance* AnimInstance;
+
 	void ThrowNade();
 
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
 
+	/*UFUNCTION()
+	void OnHit(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult & SweepResult);
+	*/
+
+	void Explode();
+
 	void ThrowSec();
 	
+	FVector ExplodeLocation;
+	bool DidHit;
+
 	UPROPERTY(VisibleAnywhere)
 	class UStaticMeshComponent* NadeMesh;
 	
