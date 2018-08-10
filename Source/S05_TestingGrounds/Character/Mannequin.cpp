@@ -42,12 +42,17 @@ AMannequin::AMannequin()
 	TP_Camera = CreateDefaultSubobject<UCameraComponent>("TP_Camera");
 	TP_Camera->SetupAttachment(Spring_Arm);
 	TP_Camera->bAutoActivate = false; 
+
+	ZoomedFOV = 65.0f;
+	ZoomInterpSpeed = 20.f;
 }
 
 // Called when the game starts or when spawned
 void AMannequin::BeginPlay()
 {
 	Super::BeginPlay();
+
+	DefaultFOV = GetUsedCamera()->FieldOfView;
 
 	SwitchCamPosition();
 
@@ -606,11 +611,35 @@ void AMannequin::NadeEquip()
 void AMannequin::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
+
+	if (WeaponCombat)
+	{
+		float TargetFOV = bWantsToZoom ? ZoomedFOV : DefaultFOV;
+		float NewFOV = FMath::FInterpTo(GetUsedCamera()->FieldOfView, TargetFOV, DeltaTime, ZoomInterpSpeed);
+		GetUsedCamera()->SetFieldOfView(NewFOV);
+	}
 }
 // Called to bind functionality to input
 void AMannequin::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {
 	Super::SetupPlayerInputComponent(PlayerInputComponent);
+
+	PlayerInputComponent->BindAxis("MoveForward", this, &AMannequin::MoveForward);
+	PlayerInputComponent->BindAxis("MoveRight", this, &AMannequin::MoveRight);
+
+	PlayerInputComponent->BindAxis("LookUp", this, &AMannequin::AddControllerPitchInput);
+	PlayerInputComponent->BindAxis("Turn", this, &AMannequin::AddControllerYawInput);
+
+	PlayerInputComponent->BindAction("Jump", IE_Pressed, this, &AMannequin::BeginJump);
+	PlayerInputComponent->BindAction("Jump", IE_Released, this, &AMannequin::EndJump);
+
+
+	PlayerInputComponent->BindAction("Crouch", IE_Pressed, this, &AMannequin::BeginCrouch);
+	PlayerInputComponent->BindAction("Crouch", IE_Released, this, &AMannequin::EndCrouch);
+
+	PlayerInputComponent->BindAction("Zoom", IE_Pressed, this, &AMannequin::BeginZoom);
+	PlayerInputComponent->BindAction("Zoom", IE_Released, this, &AMannequin::EndZoom);
+
 }
 void AMannequin::UnPossessed()
 {
@@ -619,6 +648,71 @@ void AMannequin::UnPossessed()
 	if (ensure(CurrentWeapon == nullptr)) { return; }
 
 	CurrentWeapon->AttachToComponent(GetMesh(), FAttachmentTransformRules(EAttachmentRule::SnapToTarget, true), CurrentWeapon->WeaponInfo.SocketName3P);
+}
+void AMannequin::Landed(const FHitResult & Hit)
+{
+	Super::Landed(Hit);
+	EndJump();
+}
+
+void AMannequin::MoveForward(float Value)
+{
+	
+	if ((Controller != NULL) && (Value != 0.0f))
+	{
+		// find out which way is forward
+		const FRotator Rotation = Controller->GetControlRotation();
+		const FRotator YawRotation(0, Rotation.Yaw, 0);
+
+		// get forward vector
+		const FVector Direction = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::X);
+		AddMovementInput(Direction, Value);
+	}
+}
+void AMannequin::MoveRight(float Value)
+{
+	if ((Controller != NULL) && (Value != 0.0f))
+	{
+		// find out which way is right
+		const FRotator Rotation = Controller->GetControlRotation();
+		const FRotator YawRotation(0, Rotation.Yaw, 0);
+
+		// get right vector 
+		const FVector Direction = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::Y);
+		// add movement in that direction
+		AddMovementInput(Direction, Value);
+	}
+}
+
+void AMannequin::BeginJump()
+{
+	Jump();
+	bWantsToJump = true;
+}
+void AMannequin::EndJump()
+{
+	StopJumping();
+	bWantsToJump = false;
+}
+
+void AMannequin::BeginCrouch()
+{
+	Crouch();
+	bWantToCrouch = true;
+}
+void AMannequin::EndCrouch()
+{
+	UnCrouch();
+	bWantToCrouch = false;
+}
+
+void AMannequin::BeginZoom()
+{
+	bWantsToZoom = true;
+}
+void AMannequin::EndZoom()
+{
+	bWantsToZoom = false;
 }
 
 void AMannequin::PullTrigger()
@@ -658,6 +752,7 @@ void AMannequin::SetNadeThrown(UAnimMontage* NadeBasePose)
 	NadeInHand = false;
 	Nade = nullptr;
 }
+
 void AMannequin::GetWeapons(AWeaponBase*& CurrentWeaponOut, AWeaponBase*& PrimaryWeaponOut, AWeaponBase*& SecondaryWeaponOut, ANadeActor*& NadeOut, AMeleeActor*& MeleeOut)
 {
 	if (CurrentWeapon)

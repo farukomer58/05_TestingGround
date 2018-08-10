@@ -126,6 +126,9 @@ public:
 	FWeaponInfo WeaponInfo;
 protected:
 	
+	UPROPERTY(EditDefaultsOnly,/*meta= (ClampMin = 0, ClampMax = 100)*/)
+	int32 Level;
+
 	float LastFireTime;
 	FTimerHandle TimerHandle_Fire;
 

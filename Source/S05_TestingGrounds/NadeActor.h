@@ -26,6 +26,9 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
 	FName NadeBackSocket;
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
+	FVector ScaleParticle;
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Gameplay)
 	class UParticleSystem* ExplosionEffect;
 

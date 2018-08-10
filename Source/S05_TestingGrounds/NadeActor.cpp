@@ -7,6 +7,7 @@
 #include "GameFramework/ProjectileMovementComponent.h"
 #include "Camera/CameraComponent.h"
 #include "TimerManager.h"
+#include "Particles/ParticleSystemComponent.h"
 #include "Character/Mannequin.h"
 #include "Kismet/GameplayStatics.h"
 
@@ -37,7 +38,7 @@ ANadeActor::ANadeActor()
 void ANadeActor::BeginPlay()
 {
 	Super::BeginPlay();
-
+	
 	ProjectileMovementComponent->Deactivate();
 	SphereComp->SetSimulatePhysics(false);
 }
@@ -52,7 +53,7 @@ void ANadeActor::Explode()
 {
 	UE_LOG(LogTemp, Warning, TEXT("Explode () is called!!"));
 
-	UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), NadeInfo.ExplosionEffect, GetActorLocation(), FRotator());
+	UParticleSystemComponent* ExposionComp = UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), NadeInfo.ExplosionEffect, GetActorLocation(), FRotator(),NadeInfo.ScaleParticle);
 	UGameplayStatics::PlaySoundAtLocation(this, NadeInfo.ExplosionSound, GetActorLocation());
 	RadialForceComp->FireImpulse();
 

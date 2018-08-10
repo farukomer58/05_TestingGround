@@ -56,6 +56,7 @@ public:
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
+	virtual void Landed(const FHitResult & Hit) override;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
 	bool IsFirstPerson;
@@ -70,6 +71,13 @@ protected:
 	bool NadeInHand;
 	UPROPERTY(VisibleAnywhere)
 	bool WeaponCombat;
+
+	UPROPERTY(BlueprintReadOnly)
+	bool bWantsToJump;
+	UPROPERTY(BlueprintReadOnly)
+	bool bWantToCrouch;
+	UPROPERTY(BlueprintReadOnly)
+	bool bWantsToZoom;
 
 	UPROPERTY(EditDefaultsOnly, meta = (EditCondition = "SpawnFromClass"))
 	TSubclassOf<AWeaponBase> GunActor;
@@ -91,7 +99,18 @@ protected:
 	UCameraComponent* TP_Camera;
 
 private:
-	
+	void MoveForward(float Value);
+	void MoveRight(float Value);
+
+	void BeginJump();
+	void EndJump();
+
+	void BeginCrouch();
+	void EndCrouch();
+
+	void BeginZoom();
+	void EndZoom();
+
 	void TryPickup();
 	void SetAndAttach(AWeaponBase* Weapon);
 
@@ -129,6 +148,12 @@ private:
 	float ThrowMultiplier = 1.f;
 
 	UPROPERTY(EditDefaultsOnly)
+	float ZoomedFOV;
+	UPROPERTY(EditDefaultsOnly)
+	float ZoomInterpSpeed;
+	float DefaultFOV;
+
+	UPROPERTY(EditDefaultsOnly)
 	bool SpawnFromClass;
 
 	UPROPERTY(EditDefaultsOnly)
@@ -139,9 +164,11 @@ private:
 	bool canFire = true;
 	bool isFiring;
 
+	
+
 	UPROPERTY(VisibleAnywhere)
 	ANadeActor* Nade;
-	UPROPERTY(VisibleAnywhere)
+	UPROPERTY(VisibleAnywhere )
 	AMeleeActor* Melee;
 	UPROPERTY(VisibleAnywhere)
 	AWeaponBase* CurrentWeapon = nullptr;
