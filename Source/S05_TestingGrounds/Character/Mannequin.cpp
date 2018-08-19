@@ -6,12 +6,16 @@
 #include "Components/CapsuleComponent.h"
 #include "Components/SphereComponent.h"
 #include "GameFramework/ProjectileMovementComponent.h"
+#include "Kismet/GamePlaystatics.h"
 #include "../Weapons/WeaponBase.h"
 #include "../Weapons/Melee/MeleeActor.h"
 #include "../NadeActor.h"
+#include "../Public/PickupActor.h"
+#include "../Classes/ChestActor.h"
 #include "DrawDebugHelpers.h"
 #include "Engine/World.h"
 #include "Engine.h"
+#include "../S05_TestingGrounds.h"
 
 
 // Sets default values
@@ -80,6 +84,7 @@ void AMannequin::BeginPlay()
 		InputComponent->BindAction("TryPickup", IE_Pressed, this, &AMannequin::TryPickup);
 		InputComponent->BindAction("Drop", IE_Pressed, this, &AMannequin::Drop);
 		InputComponent->BindAction("ToggleCam", IE_Pressed, this, &AMannequin::ToggleCam);
+		InputComponent->BindAction("Reload", IE_Pressed, this, &AMannequin::Reload);
 
 		InputComponent->BindAction("PrimaryEquip", IE_Pressed, this, &AMannequin::PrimaryEquip);
 		InputComponent->BindAction("SecondaryEquip", IE_Pressed, this, &AMannequin::SecondaryEquip);
@@ -135,36 +140,103 @@ void AMannequin::ToggleCam()
 
 	SwitchCamPosition();
 }
+void AMannequin::Reload()
+{
+	if (CurrentWeapon)
+	{
+		if (CurrentWeapon->GetWeaponInfo().CurrentAmmo < CurrentWeapon->GetWeaponInfo().ClipSize && CurrentWeapon->GetWeaponInfo().MaxAmmo>0)
+		{
+			CurrentWeapon->Reload();
+		}
+	}
+}
+
 
 void AMannequin::TryPickup()
 {
-	if (CanPickup)
-	{
 		FHitResult HitResult;
 		FCollisionQueryParams CollisionObjectQueryParams;
 		CollisionObjectQueryParams.AddIgnoredActor(this);
 		if(CurrentWeapon)
 			CollisionObjectQueryParams.AddIgnoredActor(CurrentWeapon);
 
-		UCameraComponent* UsedCamera = IsFirstPerson ? FP_Camera : TP_Camera;
-		FVector Start = UsedCamera->GetComponentLocation();
+		FVector Start = GetUsedCamera()->GetComponentLocation();
 		if (SpawnTraceLengthTP > 0.0f)
 			SpawnTraceLength = SpawnTraceLengthTP;
-		FVector End = (UsedCamera->GetForwardVector() * SpawnTraceLength) + Start;
+		FVector End = (GetUsedCamera()->GetForwardVector() * SpawnTraceLength) + Start;
 		
-		bool HasHit = GetWorld()->LineTraceSingleByChannel(HitResult,Start,End,ECollisionChannel::ECC_Visibility, CollisionObjectQueryParams);
-		DrawDebugLine(GetWorld(), Start, End, FColor::Green, false, 4.f);
+		bool HasHit = GetWorld()->LineTraceSingleByChannel(HitResult, Start, End, PICKUP_TRACE, CollisionObjectQueryParams);
+		//DrawDebugLine(GetWorld(), Start, End, FColor::Green, false, 1.5f);
 
 		if (HasHit)
 		{
+			AChestActor* Chest = Cast<AChestActor>(HitResult.GetActor());
+			APickupActor* PickupActor = Cast<APickupActor>(HitResult.GetActor());
 			if (Cast<AWeaponBase>(HitResult.GetActor()))
 			{
 				//UE_LOG(LogTemp, Error, TEXT("You can pickup: %s"), *HitResult.GetActor()->GetName());
 				Pickup(HitResult.GetActor());
 			}
+			if (Cast<ANadeActor>(HitResult.GetActor()))
+			{
+				AmountOfNade = 3.f;
+				if (Nade == nullptr)
+				{
+					Nade = GetWorld()->SpawnActor<ANadeActor>(NadeActor);
+					Nade->SetOwner(this);
+					NadeEquip();
+				}
+				HitResult.GetActor()->Destroy();
+			}
+			else if (PickupActor)
+			{
+				if (PickupActor->IsHealth)
+				{
+					if (CurrentHealth < MaxHealth)
+					{
+						CurrentHealth = MaxHealth;
+						PickupActor->Destroy();
+						UGameplayStatics::PlaySound2D(this, HealthPickupSound);
+					}
+					else {
+						if (ErrorHandle.IsValid()) { return; }
+						ShouldError = true;
+						ErrorMessage = "ALREADY FULL HEALTH!!";
+						GetWorldTimerManager().SetTimer(ErrorHandle, this, &AMannequin::ResetError, 2.0f, false);
+					}
+				}
+				else {
+					if (CurrentWeapon)
+					{
+						if (CurrentWeapon->GetWeaponInfo().CurrentAmmo < CurrentWeapon->GetWeaponInfo().ClipSize || CurrentWeapon->GetWeaponInfo().MaxAmmo < CurrentWeapon->GetWeaponInfo().ResetMaxAmmo)
+						{
+							CurrentWeapon->ResetAmmo();
+							PickupActor->Destroy();
+							UGameplayStatics::PlaySound2D(this, AmmoPickupSound);
+						}
+						else {
+							if (ErrorHandle.IsValid()) { return; }
+							ShouldError = true;
+							ErrorMessage = "AlreadyFullAmmo!!";
+							GetWorldTimerManager().SetTimer(ErrorHandle, this, &AMannequin::ResetError, 2.0f, false);
+						}
+					}
+				}
+			}
+			else if (Chest)
+			{
+				if (Chest->CanOpen && CurrentMoney >= Chest->CostChest)
+				{
+					Chest->OpenChest();
+				}
+				else {
+					if (ErrorHandle.IsValid()) { return; }
+					ShouldError = true;
+					ErrorMessage = "CAN NOT OPEN CHEST!!";
+					GetWorldTimerManager().SetTimer(ErrorHandle, this, &AMannequin::ResetError, 2.0f, false);
+				}
+			}
 		}
-
-	}
 }
 void AMannequin::Pickup(AActor* PickedActor)
 {
@@ -176,38 +248,64 @@ void AMannequin::Pickup(AActor* PickedActor)
 void AMannequin::SpawnAndAttachWeapon(UClass* SpawnClass)
 {
 	if (SpawnClass == NULL) { UE_LOG(LogTemp, Warning, TEXT("NO CurrentWeapon GIVEN TO : %s"), *GetName()); return; }
+	
+	/*SpawningClass = SpawnClass;
 	if (CurrentWeapon)
 	{
-		if (SpawnClass == CurrentWeapon->GetClass() || (PrimaryWeapon && SecondaryWeapon))
+		if (SpawnClass == CurrentWeapon->GetClass()|| (PrimaryWeapon && SecondaryWeapon))
 		{
 			Drop();
 		}
+	}*/
+	FActorSpawnParameters SpawnParams;
+	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	SpawnedWeapon = GetWorld()->SpawnActor<AWeaponBase>(SpawnClass, GetActorTransform(), SpawnParams);
+	bool ShouldSpawn = true;
+
+	if (CurrentWeapon && SpawnedWeapon)
+	{
+		if (SpawnedWeapon->GetClass() == CurrentWeapon->GetClass() || SpawnedWeapon->GetWeaponInfo().WeaponClass == CurrentWeapon->GetWeaponInfo().WeaponClass || (PrimaryWeapon && SecondaryWeapon))
+		{
+			if (SpawnedWeapon->GetWeaponInfo().WeaponClass == EWeaponClass::PrimaryWeapon && SecondaryInHand)
+			{
+				if (ErrorHandle.IsValid()) { return; }
+				ShouldSpawn= false;
+				ShouldError = true;
+				ErrorMessage = "First Drop u PrimaryWeapon to pick this Up!!!";
+				GetWorldTimerManager().SetTimer(ErrorHandle, this, &AMannequin::ResetError, 2.0f, false);
+			}
+			else if(SpawnedWeapon->GetWeaponInfo().WeaponClass == EWeaponClass::SecondaryWeapon && PrimaryInHand) {
+				if (ErrorHandle.IsValid()) { return; }
+				ShouldSpawn = false;
+				ShouldError = true;
+				ErrorMessage = "First Drop u SecondaryWeapon to pick this Up!!!";
+				GetWorldTimerManager().SetTimer(ErrorHandle, this, &AMannequin::ResetError, 2.0f, false);
+			}
+			else {
+				ShouldSpawn = true;
+				ShouldError = false;
+				Drop();
+			}
+		}
 	}
-	
-	SpawningClass = SpawnClass;
+	if (!ShouldSpawn) { UE_LOG(LogTemp, Warning, TEXT("I WILL NOT SPAWNN THE WANTED WEAPONN!!!"));  return; }
 
 	FTimerHandle QuickHandle;
 	GetWorldTimerManager().SetTimer(QuickHandle, this, &AMannequin::SpawnAndAttach, 0.06f, false);
 }
 void AMannequin::SpawnAndAttach()
 {
-	if (!ensure(SpawningClass)) { return; }
+	if (ensure(SpawnedWeapon == nullptr)) { return; }
 
-	FActorSpawnParameters SpawnParams;
-	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-	AWeaponBase* SpawnedWeapon = GetWorld()->SpawnActor<AWeaponBase>(SpawningClass, GetActorTransform(), SpawnParams);
-	
 	SpawnedWeapon->SetOwner(this);
 	canFire = true;
-
-	if (ensure(SpawnedWeapon == nullptr)) { return; }
 	
-	if (SpawnedWeapon->WeaponInfo.WeaponClass == EWeaponClass::PrimaryWeapon)
+	if (SpawnedWeapon->GetWeaponInfo().WeaponClass == EWeaponClass::PrimaryWeapon)
 	{
 		PrimaryWeapon = SpawnedWeapon;
 		SetAndAttach(PrimaryWeapon);
 	}
-	if (SpawnedWeapon->WeaponInfo.WeaponClass == EWeaponClass::SecondaryWeapon)
+	if (SpawnedWeapon->GetWeaponInfo().WeaponClass == EWeaponClass::SecondaryWeapon)
 	{
 		SecondaryWeapon = SpawnedWeapon;
 		SetAndAttach(SecondaryWeapon);
@@ -221,38 +319,38 @@ void AMannequin::AttachToHand(AWeaponBase* Weapon)
 
 	if (IsPlayerControlled() && IsFirstPerson)
 	{
-		Weapon->AttachToComponent(FP_ArmMesh, FAttachmentTransformRules::SnapToTargetNotIncludingScale, Weapon->WeaponInfo.SocketName1P);
+		Weapon->AttachToComponent(FP_ArmMesh, FAttachmentTransformRules::SnapToTargetNotIncludingScale, Weapon->GetWeaponInfo().SocketName1P);
 	}
 	else
 	{
-		Weapon->AttachToComponent(GetMesh(), FAttachmentTransformRules::SnapToTargetNotIncludingScale, Weapon->WeaponInfo.SocketName3P);
+		Weapon->AttachToComponent(GetMesh(), FAttachmentTransformRules::SnapToTargetNotIncludingScale, Weapon->GetWeaponInfo().SocketName3P);
 	}
 
 	bUseControllerRotationYaw = true;
 	WeaponCombat = true;
 
-	if(Weapon->WeaponInfo.WeaponClass==EWeaponClass::PrimaryWeapon)
+	if(Weapon->GetWeaponInfo().WeaponClass==EWeaponClass::PrimaryWeapon)
 		PrimaryInHand = true;
-	if (Weapon->WeaponInfo.WeaponClass == EWeaponClass::SecondaryWeapon)
+	if (Weapon->GetWeaponInfo().WeaponClass == EWeaponClass::SecondaryWeapon)
 		SecondaryInHand = true;
 }
 void AMannequin::AttachToBack(AWeaponBase* Weapon)
 {
 	if (Weapon == nullptr) { return; }
 
-	if (Weapon->WeaponInfo.WeaponClass== EWeaponClass::PrimaryWeapon)
+	if (Weapon->GetWeaponInfo().WeaponClass== EWeaponClass::PrimaryWeapon)
 	{
-		Weapon->AttachToComponent(GetMesh(), FAttachmentTransformRules::SnapToTargetNotIncludingScale, Weapon->WeaponInfo.PrimaryBack);
+		Weapon->AttachToComponent(GetMesh(), FAttachmentTransformRules::SnapToTargetNotIncludingScale, Weapon->GetWeaponInfo().PrimaryBack);
 	}
 	else
 	{
-		Weapon->AttachToComponent(GetMesh(), FAttachmentTransformRules::SnapToTargetNotIncludingScale, Weapon->WeaponInfo.SecondaryBack);
+		Weapon->AttachToComponent(GetMesh(), FAttachmentTransformRules::SnapToTargetNotIncludingScale, Weapon->GetWeaponInfo().SecondaryBack);
 	}
 
 	
-	if (Weapon->WeaponInfo.WeaponClass == EWeaponClass::PrimaryWeapon)
+	if (Weapon->GetWeaponInfo().WeaponClass == EWeaponClass::PrimaryWeapon)
 		PrimaryInHand = false;
-	if (Weapon->WeaponInfo.WeaponClass == EWeaponClass::SecondaryWeapon)
+	if (Weapon->GetWeaponInfo().WeaponClass == EWeaponClass::SecondaryWeapon)
 		SecondaryInHand = false;
 
 	if(PrimaryInHand|| SecondaryInHand)
@@ -270,10 +368,7 @@ void AMannequin::SetAndAttach(AWeaponBase* Weapon)
 	Weapon->TurnOfAll();
 	Weapon->SetAnimInstances(FP_ArmMesh->GetAnimInstance(), GetMesh()->GetAnimInstance());
 
-	/*	Weapon->AnimInstance1P = FP_ArmMesh->GetAnimInstance();
-		Weapon->AnimInstance3P = GetMesh()->GetAnimInstance();*/
-
-	if (Weapon->WeaponInfo.WeaponClass == EWeaponClass::PrimaryWeapon)
+	if (Weapon->GetWeaponInfo().WeaponClass == EWeaponClass::PrimaryWeapon)
 	{
 		/*if (SecondaryInHand)
 		{
@@ -420,12 +515,13 @@ void AMannequin::AttachNadeToBack(AActor* ActorToAttach)
 void AMannequin::Drop()
 {
 	if (CurrentWeapon == nullptr) { return; }
+	if (CurrentWeapon->GetIsReloading()) { return; }
 
 	if (PrimaryInHand)
 	{
 		if (!isFiring)
 		{
-			CurrentWeapon->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
+			PrimaryWeapon->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
 
 			float ThrowSpeed;
 			if ((GetVelocity().Size()*2.5f) < 200)
@@ -437,8 +533,8 @@ void AMannequin::Drop()
 			}
 			UCameraComponent* CameraToUse = IsFirstPerson ? FP_Camera : TP_Camera;
 			FVector MadeVelocity = ((CameraToUse->GetForwardVector()*ThrowSpeed) + (CameraToUse->GetUpVector() * 300)) * ThrowMultiplier;
-			CurrentWeapon->GetProjectileMovementComp()->Velocity = MadeVelocity;
-			CurrentWeapon->GetProjectileMovementComp()->Activate();
+			PrimaryWeapon->GetProjectileMovementComp()->Velocity = MadeVelocity;
+			PrimaryWeapon->GetProjectileMovementComp()->Activate();
 
 			FTimerHandle HandleDrop;
 			GetWorldTimerManager().SetTimer(HandleDrop, this, &AMannequin::DropSec, 0.05f, false);
@@ -453,7 +549,7 @@ void AMannequin::Drop()
 	else {
 		if (!isFiring)
 		{
-			CurrentWeapon->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
+			SecondaryWeapon->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
 
 			float ThrowSpeed;
 			if ((GetVelocity().Size()*2.5f) < 200)
@@ -465,8 +561,8 @@ void AMannequin::Drop()
 			}
 			UCameraComponent* CameraToUse = IsFirstPerson ? FP_Camera : TP_Camera;
 			FVector MadeVelocity = ((CameraToUse->GetForwardVector()*ThrowSpeed) + (CameraToUse->GetUpVector() * 300)) * ThrowMultiplier;
-			CurrentWeapon->GetProjectileMovementComp()->Velocity = MadeVelocity;
-			CurrentWeapon->GetProjectileMovementComp()->Activate();
+			SecondaryWeapon->GetProjectileMovementComp()->Velocity = MadeVelocity;
+			SecondaryWeapon->GetProjectileMovementComp()->Activate();
 
 			FTimerHandle HandleDrop;
 			GetWorldTimerManager().SetTimer(HandleDrop, this, &AMannequin::DropSec, 0.05f, false);
@@ -500,10 +596,19 @@ void AMannequin::DropSec()
 		}
 	}
 }
+void AMannequin::ResetError()
+{
+	ShouldError = false;
+	ErrorMessage = "";
+	GetWorldTimerManager().ClearTimer(ErrorHandle);
+}
 
 void AMannequin::PrimaryEquip()
 {
 	if (PrimaryWeapon== nullptr) { return; }
+	
+	if (CurrentWeapon)
+		if (CurrentWeapon->GetIsReloading() || isFiring) { return; }
 
 	if (SecondaryInHand)
 	{
@@ -515,7 +620,6 @@ void AMannequin::PrimaryEquip()
 		else {
 			AttachToBack(PrimaryWeapon);
 		}
-		
 	}
 	else if (NadeInHand)
 		{
@@ -647,7 +751,7 @@ void AMannequin::UnPossessed()
 
 	if (ensure(CurrentWeapon == nullptr)) { return; }
 
-	CurrentWeapon->AttachToComponent(GetMesh(), FAttachmentTransformRules(EAttachmentRule::SnapToTarget, true), CurrentWeapon->WeaponInfo.SocketName3P);
+	CurrentWeapon->AttachToComponent(GetMesh(), FAttachmentTransformRules(EAttachmentRule::SnapToTarget, true), CurrentWeapon->GetWeaponInfo().SocketName3P);
 }
 void AMannequin::Landed(const FHitResult & Hit)
 {
@@ -750,7 +854,17 @@ void AMannequin::SetNadeThrown(UAnimMontage* NadeBasePose)
 	GetMesh()->GetAnimInstance()->Montage_Stop(0.05f, NadeBasePose);
 	bUseControllerRotationYaw = false;;
 	NadeInHand = false;
-	Nade = nullptr;
+	AmountOfNade = AmountOfNade - 1;
+	if (AmountOfNade <= 0)
+	{
+		Nade = nullptr;
+	}
+	else if (NadeActor)
+	{
+			Nade = GetWorld()->SpawnActor<ANadeActor>(NadeActor);
+			Nade->SetOwner(this);
+			NadeEquip();
+	}
 }
 
 void AMannequin::GetWeapons(AWeaponBase*& CurrentWeaponOut, AWeaponBase*& PrimaryWeaponOut, AWeaponBase*& SecondaryWeaponOut, ANadeActor*& NadeOut, AMeleeActor*& MeleeOut)
@@ -777,4 +891,9 @@ bool AMannequin::GetWeaponCombat()
 bool AMannequin::GetIsFirstPerson()
 {
 	return IsFirstPerson;
+}
+void AMannequin::GetErrorMessage(bool& ShouldErrorOut, FString& ErrorMessageOut)
+{
+	ShouldErrorOut = ShouldError;
+	ErrorMessageOut = ErrorMessage;
 }

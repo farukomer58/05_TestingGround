@@ -17,6 +17,8 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
 	float Damage = 50.f;
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
+	float DamageRadius = 330.f;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
 	float ThrowSpeed = 2000.f;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
@@ -98,6 +100,9 @@ protected:
 	
 	UPROPERTY(VisibleAnywhere)
 	UProjectileMovementComponent* ProjectileMovementComponent;
+
+	UPROPERTY(EditDefaultsOnly)
+	TSubclassOf<UDamageType> DamageType;
 
 	AMannequin* PlayerCharacter;
 	

@@ -26,3 +26,8 @@ void AInfiniteTerrainGameMode::AddToPool(class ANavMeshBoundsVolume* VolumeToAdd
 {
 	NavMeshBoundsVolumePool->Add(VolumeToAdd);
 }
+
+void AInfiniteTerrainGameMode::IncrementScore()
+{
+	Score++;
+}

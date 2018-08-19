@@ -7,6 +7,7 @@
 #include "Components/SphereComponent.h"
 #include "GameFramework/ProjectileMovementComponent.h"
 #include "../Weapons/WeaponBase.h"
+#include "../Weapons/BallProjectile.h"
 #include "DrawDebugHelpers.h"
 #include "Engine/World.h"
 #include "Engine.h"
@@ -58,7 +59,6 @@ void AMannequinAI::BeginPlay()
 	{
 		InputComponent->BindAction("Fire", IE_Pressed, this, &AMannequinAI::TriggerTimer);
 		InputComponent->BindAction("Fire", IE_Released, this, &AMannequinAI::StopTriggerTimer);
-		InputComponent->BindAction("TryPickup", IE_Pressed, this, &AMannequinAI::TryPickup);
 		InputComponent->BindAction("Drop", IE_Pressed, this, &AMannequinAI::Drop);
 		InputComponent->BindAction("ToggleCam", IE_Pressed, this, &AMannequinAI::ToggleCam);
 	}
@@ -76,7 +76,7 @@ void AMannequinAI::SwitchCamPosition()
 		Spring_Arm->bUsePawnControlRotation = false;
 		SpawnTraceLengthTP = 0.0f;
 		if (CurrentWeapon)
-			CurrentWeapon->AttachToComponent(FP_ArmMesh, FAttachmentTransformRules::SnapToTargetIncludingScale, CurrentWeapon->WeaponInfo.SocketName1P);
+			CurrentWeapon->AttachToComponent(FP_ArmMesh, FAttachmentTransformRules::SnapToTargetIncludingScale, CurrentWeapon->GetWeaponInfo().SocketName1P);
 	}
 	else {
 		FP_ArmMesh->SetHiddenInGame(true);
@@ -86,7 +86,7 @@ void AMannequinAI::SwitchCamPosition()
 		Spring_Arm->bUsePawnControlRotation = true;
 		SpawnTraceLengthTP = 600.f;
 		if (CurrentWeapon)
-			CurrentWeapon->AttachToComponent(GetMesh(), FAttachmentTransformRules::SnapToTargetIncludingScale, CurrentWeapon->WeaponInfo.SocketName3P);
+			CurrentWeapon->AttachToComponent(GetMesh(), FAttachmentTransformRules::SnapToTargetIncludingScale, CurrentWeapon->GetWeaponInfo().SocketName3P);
 	}
 }
 void AMannequinAI::ToggleCam()
@@ -102,33 +102,6 @@ void AMannequinAI::ToggleCam()
 	SwitchCamPosition();
 }
 
-void AMannequinAI::TryPickup()
-{
-	if (CanPickup)
-	{
-		FHitResult HitResult;
-		FCollisionQueryParams CollisionObjectQueryParams;
-		CollisionObjectQueryParams.AddIgnoredActor(this);
-
-		UCameraComponent* UsedCamera = IsFirstPerson ? FP_Camera : TP_Camera;
-		FVector Start = UsedCamera->GetComponentLocation();
-		if (SpawnTraceLengthTP > 0.0f)
-			SpawnTraceLength = SpawnTraceLengthTP;
-		FVector End = (UsedCamera->GetForwardVector() * SpawnTraceLength) + Start;
-
-		bool HasHit = GetWorld()->LineTraceSingleByChannel(HitResult, Start, End, ECollisionChannel::ECC_Visibility, CollisionObjectQueryParams);
-		DrawDebugLine(GetWorld(), Start, End, FColor::Green, false, 4.f);
-
-		if (HasHit)
-		{
-			if (Cast<AWeaponBase>(HitResult.GetActor()))
-			{
-				//UE_LOG(LogTemp, Error, TEXT("You can pickup: %s"), *HitResult.GetActor()->GetName());
-				Pickup(HitResult.GetActor());
-			}
-		}
-	}
-}
 void AMannequinAI::Drop()
 {
 	if (CurrentWeapon)
@@ -184,11 +157,11 @@ void AMannequinAI::SpawnAndAttach()
 	CurrentWeapon->TurnOfAll();
 	if (IsPlayerControlled() && IsFirstPerson)
 	{
-		CurrentWeapon->AttachToComponent(FP_ArmMesh, FAttachmentTransformRules::SnapToTargetIncludingScale, CurrentWeapon->WeaponInfo.SocketName1P);
+		CurrentWeapon->AttachToComponent(FP_ArmMesh, FAttachmentTransformRules::SnapToTargetIncludingScale, CurrentWeapon->GetWeaponInfo().SocketName1P);
 	}
 	else
 	{
-		CurrentWeapon->AttachToComponent(GetMesh(), FAttachmentTransformRules::SnapToTargetIncludingScale, CurrentWeapon->WeaponInfo.SocketName3P);
+		CurrentWeapon->AttachToComponent(GetMesh(), FAttachmentTransformRules::SnapToTargetIncludingScale, CurrentWeapon->GetWeaponInfo().SocketName3P);
 	}
 
 	CurrentWeapon->SetAnimInstances(FP_ArmMesh->GetAnimInstance(), GetMesh()->GetAnimInstance());
@@ -213,14 +186,146 @@ void AMannequinAI::UnPossessed()
 
 	if (ensure(CurrentWeapon == nullptr)) { return; }
 
-	CurrentWeapon->AttachToComponent(GetMesh(), FAttachmentTransformRules(EAttachmentRule::SnapToTarget, true), CurrentWeapon->WeaponInfo.SocketName3P);
+	CurrentWeapon->AttachToComponent(GetMesh(), FAttachmentTransformRules(EAttachmentRule::SnapToTarget, true), CurrentWeapon->GetWeaponInfo().SocketName3P);
 }
 void AMannequinAI::PullTrigger()
 {
-	if (!ensure(CurrentWeapon) && !canFire) { return; }
-	isFiring = true;
-	CurrentWeapon->OnFire();
+	if (!ensure(CurrentWeapon)) { return; }
+	
+	// try and fire a projectile
+		UWorld* const World = GetWorld();
+		if (World != NULL)
+		{
+				const FRotator SpawnRotation = GetControlRotation();
+				// MuzzleOffset is in camera space, so transform it to world space before offsetting from the character location to find the final muzzle position
+				const FVector SpawnLocation = CurrentWeapon->GetSocketLocation();
+
+				//Set Spawn Collision Handling Override
+				FActorSpawnParameters ActorSpawnParams;
+				ActorSpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
+
+				// spawn the projectile at the muzzle
+				World->SpawnActor<ABallProjectile>(ProjectileClass, SpawnLocation, SpawnRotation, ActorSpawnParams);
+		}
+
+	// try and play the sound if specified
+	if (FireSound != NULL)
+	{
+		UGameplayStatics::PlaySoundAtLocation(this, FireSound, GetActorLocation());
+	}
+	// try and play a firing animation if specified
+	if (FireAnimation3P != NULL)
+	{
+		// Get the animation object for the arms mesh
+		UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
+		if (AnimInstance != NULL)
+		{
+			AnimInstance->Montage_Play(FireAnimation3P, 1.f);
+		}
+	}
+
+	/*isFiring = true;
+	
+
+		if (GetWeaponInfo().CurrentAmmo > 0)
+		{
+			GetWeaponInfo().CurrentAmmo = GetWeaponInfo().CurrentAmmo - 1;
+		}
+		else {
+			UE_LOG(LogTemp, Warning, TEXT("%s: NO AMMO LEFT"), *this->GetName());
+			return;
+		}
+
+		AActor* ActorOwner = GetOwner();
+
+		if (ActorOwner)
+		{
+			bool HasHit;
+			FVector Start;
+			FVector End;
+
+			FVector TracerEndPoint = End;
+
+			FHitResult HitResult;
+
+			FCollisionQueryParams QueryParams;
+			QueryParams.AddIgnoredActor(ActorOwner);
+			QueryParams.AddIgnoredActor(this);
+			QueryParams.bTraceComplex = true;
+			QueryParams.bReturnPhysicalMaterial = true;
+
+			if (GetWeaponInfo().IsShotgun)
+			{
+				for (int32 i = 0; i < GetWeaponInfo().ShotsPerFire; i++)
+				{
+					CalculateStartAndEnd(Start, End);
+					FVector Spread = FVector(
+						(FMath::RandRange(-GetWeaponInfo().SpreadRadius, GetWeaponInfo().SpreadRadius)),
+						(FMath::RandRange(-GetWeaponInfo().SpreadRadius, GetWeaponInfo().SpreadRadius)),
+						(FMath::RandRange(-GetWeaponInfo().SpreadRadius, GetWeaponInfo().SpreadRadius))
+					);
+					HasHit = GetWorld()->LineTraceSingleByChannel(HitResult, Start, (End + Spread), ECollisionChannel::ECC_GameTraceChannel3, QueryParams);
+					DrawDebugLine(GetWorld(), Start, (End + Spread), FColor::Red, true);
+					/*if (HasHit)
+					{
+					UGameplayStatics::ApplyDamage(HitResult.GetActor(), GetWeaponInfo().Damage, PlayerCharacter->GetController(), nullptr, nullptr);
+					GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Green, FString::Printf(TEXT("I Hit: %s"), *HitResult.GetActor()->GetName()));
+					}
+				}
+			}
+			else
+			{
+				CalculateStartAndEnd(Start, End);
+
+				HasHit = GetWorld()->LineTraceSingleByChannel(HitResult, Start, End, ECollisionChannel::ECC_GameTraceChannel3, QueryParams);
+				DrawDebugLine(GetWorld(), Start, End, FColor::Red, true);
+				/*if (HasHit)
+				{
+				UGameplayStatics::ApplyDamage(HitResult.GetActor(), GetWeaponInfo().Damage, PlayerCharacter->GetController(), nullptr, nullptr);
+				GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Green, FString::Printf(TEXT("I Hit: %s"), *HitResult.GetActor()->GetName()));
+				}
+			}
+
+			if (HasHit)
+			{
+				AActor* HitActor = HitResult.GetActor();
+
+				EPhysicalSurface  SurfaceType = UPhysicalMaterial::DetermineSurfaceType(HitResult.PhysMaterial.Get());
+
+				float ActualDamage = GetWeaponInfo().Damage;
+				if (SurfaceType == SURFACE_FLESHEAD)
+				{
+					ActualDamage *= 4.f;
+				}
+				UGameplayStatics::ApplyPointDamage(HitActor, ActualDamage, PlayerCharacter->GetUsedCamera()->GetForwardVector(), HitResult, ActorOwner->GetInstigatorController(), this, DamageType);
+				GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Green, FString::Printf(TEXT("I Hit: %s and the component: %s"), *HitResult.GetActor()->GetName(), *HitResult.GetComponent()->GetName()));
+
+				UParticleSystem* SelectedEffect = nullptr;
+				switch (SurfaceType)
+				{
+				case SURFACE_FLESHDEFAULT:
+					SelectedEffect = GetWeaponInfo().FleshImpactParticle;
+					break;
+				case SURFACE_FLESHEAD:
+					SelectedEffect = GetWeaponInfo().HeadImpactParticle;
+					break;
+				default:
+					SelectedEffect = GetWeaponInfo().DefaultImpactParticle;
+					break;
+				}
+				if (SelectedEffect)
+				{
+					UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), SelectedEffect, HitResult.ImpactPoint, HitResult.Normal.Rotation());
+				}
+				TracerEndPoint = HitResult.ImpactPoint;
+			}
+
+			PlayFireEffects(TracerEndPoint);
+
+			LastFireTime = GetWorld()->TimeSeconds;
+		}*/
 }
+
 void AMannequinAI::TriggerTimer()
 {
 	if (!(CurrentWeapon) && !canFire) { return; }

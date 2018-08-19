@@ -6,6 +6,7 @@
 #include "GameFramework/Character.h"
 #include "MannequinAI.generated.h"
 
+
 UCLASS()
 class S05_TESTINGGROUNDS_API AMannequinAI : public ACharacter
 {
@@ -50,17 +51,33 @@ public:
 	TSubclassOf<class AWeaponBase> GunActor;
 
 	bool CanPickup = true;
+	
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
+	float CurrentHealth = 100.f;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
+	float MaxHealth = 100.f;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
+	bool IsAiming = true;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
+	bool IsDead;
 
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Gameplay)
+	TSubclassOf<class ABallProjectile> ProjectileClass;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Gameplay)
+	class USoundBase* FireSound;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Gameplay)
+	class UAnimMontage* FireAnimation3P;
+
 	UPROPERTY(VisibleAnywhere)
 	class USkeletalMeshComponent* FP_ArmMesh;
 
 private:
-
-	void TryPickup();
 
 	void Drop();
 	void DropSec();

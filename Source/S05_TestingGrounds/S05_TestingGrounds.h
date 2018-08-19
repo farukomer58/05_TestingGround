@@ -3,3 +3,8 @@
 #pragma once
 
 #include "CoreMinimal.h"
+
+#define SURFACE_FLESHDEFAULT	SurfaceType1
+#define SURFACE_FLESHEAD		SurfaceType2
+
+#define PICKUP_TRACE			ECC_GameTraceChannel4

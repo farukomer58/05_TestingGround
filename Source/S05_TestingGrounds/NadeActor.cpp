@@ -53,8 +53,13 @@ void ANadeActor::Explode()
 {
 	UE_LOG(LogTemp, Warning, TEXT("Explode () is called!!"));
 
+	TArray<AActor*> IgnoredActors;
+
+	if (!GetOwner()) { return; }
+
 	UParticleSystemComponent* ExposionComp = UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), NadeInfo.ExplosionEffect, GetActorLocation(), FRotator(),NadeInfo.ScaleParticle);
-	UGameplayStatics::PlaySoundAtLocation(this, NadeInfo.ExplosionSound, GetActorLocation());
+	UGameplayStatics::PlaySound2D(this, NadeInfo.ExplosionSound);
+	UGameplayStatics::ApplyRadialDamage(GetWorld(), NadeInfo.Damage, GetActorLocation(), NadeInfo.DamageRadius, DamageType, IgnoredActors, GetOwner(), GetOwner()->GetInstigatorController(), true);
 	RadialForceComp->FireImpulse();
 
 	Destroy();

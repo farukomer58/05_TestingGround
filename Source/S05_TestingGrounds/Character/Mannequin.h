@@ -10,6 +10,8 @@ class USkeletalMeshComponent;
 class UCameraComponent;
 class USpringArmComponent;
 class UAnimMontage;
+class USoundBase;
+
 
 class AWeaponBase;
 class ANadeActor;
@@ -49,9 +51,27 @@ public:
 	UFUNCTION(BlueprintCallable, BlueprintPure)
 	bool GetWeaponCombat();
 	
+	UFUNCTION(BlueprintCallable, BlueprintPure)
+	void GetErrorMessage(bool& ShouldErrorOut, FString& ErrorMessageOut);
+
 	bool GetIsFirstPerson();
 
 	UCameraComponent* GetUsedCamera();
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
+	float CurrentMoney = 1000.f;
+	
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
+	float AmountOfNade = 3.f;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	bool NadeInHand;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
+		float CurrentHealth;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
+		float MaxHealth;
+
 
 protected:
 	// Called when the game starts or when spawned
@@ -67,8 +87,7 @@ protected:
 	bool SecondaryInHand;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
 	bool MeleeInHand;
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
-	bool NadeInHand;
+	
 	UPROPERTY(VisibleAnywhere)
 	bool WeaponCombat;
 
@@ -79,12 +98,24 @@ protected:
 	UPROPERTY(BlueprintReadOnly)
 	bool bWantsToZoom;
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
+	bool ShouldError;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
+	FString ErrorMessage;
+	FTimerHandle ErrorHandle;
+
 	UPROPERTY(EditDefaultsOnly, meta = (EditCondition = "SpawnFromClass"))
 	TSubclassOf<AWeaponBase> GunActor;
 	UPROPERTY(EditDefaultsOnly)
 	TSubclassOf<ANadeActor> NadeActor;
 	UPROPERTY(EditDefaultsOnly)
 	TSubclassOf<AMeleeActor> MeleeActor;
+
+	UPROPERTY(EditDefaultsOnly)
+	USoundBase* AmmoPickupSound;
+	
+	UPROPERTY(EditDefaultsOnly)
+	USoundBase* HealthPickupSound;
 
 	UPROPERTY(VisibleAnywhere)
 	USkeletalMeshComponent* FP_ArmMesh;
@@ -97,6 +128,7 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, meta = (AllowPrivateAccess = "true"))
 	UCameraComponent* TP_Camera;
+
 
 private:
 	void MoveForward(float Value);
@@ -127,6 +159,9 @@ private:
 	void DropSec();
 
 	void ToggleCam();
+	void Reload();
+
+	void ResetError();
 
 	void SpawnAndAttachWeapon(UClass* SpawnClass);
 	void SpawnAndAttach();
@@ -137,6 +172,7 @@ private:
 	void NadeEquip();
 
 	UClass* SpawningClass;
+	AWeaponBase* SpawnedWeapon;
 
 	UPROPERTY(EditDefaultsOnly)
 	float SpawnTraceLength = 300.f;

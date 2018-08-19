@@ -38,15 +38,24 @@ struct FWeaponInfo
 
 public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
+	bool bIsOneShot = false;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	EWeaponClass WeaponClass;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
 	float CurrentAmmo = 100.f;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
+	float MaxAmmo= 100.f;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
+	float ResetMaxAmmo = 100.f;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
+	float ClipSize = 30.f;
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
 	float Damage = 50.f;;
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
 	float FireRate = 0.15f;
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	EWeaponClass WeaponClass;
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
 	float SprayRange = 300.f;
+	
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
 	bool IsShotgun;
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, meta = (EditCondition = "IsShotgun"))
@@ -56,30 +65,47 @@ public:
 
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
-	FName SocketName1P;
+	FName SocketName1P = FName("WeaponSocket1P");
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
-	FName SocketName3P;
+	FName SocketName3P = FName("WeaponSocket3P");
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
-	FName PrimaryBack;
+	FName PrimaryBack = FName("PrimaryBackSocket");;
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
-	FName SecondaryBack;
+	FName SecondaryBack= FName("SecondaryBackSocket");
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
+	FName MuzzleSocket = FName("Muzzle");
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
+	FName TraceBeamSocket = FName("BeamEnd");
 
-	/** Projectile class to spawn */
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = Projectile)
-	TSubclassOf<class ABallProjectile> ProjectileClass;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
+	TSubclassOf<class UCameraShake> FireCamShake;
 
-	/** Sound to play each time we fire */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Gameplay)
+	class UParticleSystem* DefaultImpactParticle;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Gameplay)
+	UParticleSystem* FleshImpactParticle;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Gameplay)
+	UParticleSystem* HeadImpactParticle;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Gameplay)
+	UParticleSystem* FireParticle;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Gameplay)
+	UParticleSystem* TracerParticle;
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Gameplay)
 	class USoundBase* FireSound;
 
-	/** AnimMontage to play each time we fire */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Gameplay)
 	class UAnimMontage* FireAnimation1P;
 
-	/** AnimMontage to play each time we fire */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Gameplay)
 	class UAnimMontage* FireAnimation3P;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Gameplay)
+	class UAnimMontage* ReloadMontage;
 	
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Gameplay)
+	class UMaterialInterface* WeaponMaterial;
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Gameplay)
 	class UTexture* ImageUI;
 };
@@ -115,25 +141,51 @@ public:
 	void TurnOfAll();
 	void EnableAll();
 
+	void Reload();
+	void ReloadMain();
+
+	void SetPhysics(bool val);
 	void SetAnimInstances(UAnimInstance* SettedAnimInstance1P, UAnimInstance* SettedAnimInstance3P);
+	
+	UFUNCTION(BlueprintCallable)
+	void RefreshMaterial();
 
 	UProjectileMovementComponent* GetProjectileMovementComp();
 
-	UPROPERTY(EditDefaultsOnly)
-	FAddController AddController;
+	UFUNCTION(BlueprintCallable,BlueprintPure)
+	FWeaponInfo& GetWeaponInfo();
 
-	UPROPERTY(EditAnywhere,BlueprintReadWrite)
-	FWeaponInfo WeaponInfo;
-protected:
+	bool GetIsReloading();
 	
-	UPROPERTY(EditDefaultsOnly,/*meta= (ClampMin = 0, ClampMax = 100)*/)
-	int32 Level;
+	void ResetAmmo();
 
+	FVector GetSocketLocation();
+
+	UPROPERTY(EditAnywhere,BlueprintReadWrite/*,meta= (ClampMin = 0, ClampMax = 100)*/)
+	int32 Level;
+	
+	
+protected:
 	float LastFireTime;
 	FTimerHandle TimerHandle_Fire;
 
 	UAnimInstance* AnimInstance1P;
 	UAnimInstance* AnimInstance3P;
+
+	TSubclassOf<UDamageType> DamageType;
+
+	UPROPERTY(EditDefaultsOnly)
+	FAddController AddController;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FWeaponInfo WeaponInfo_Zero;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FWeaponInfo WeaponInfo_One;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FWeaponInfo WeaponInfo_Two;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FWeaponInfo WeaponInfo_Three;
+	FWeaponInfo WeaponInfoEmpty;
 
 	/** Gun mesh: 1st person view (seen only by self) */
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = Mesh)
@@ -160,6 +212,8 @@ private:
 	void CalculateStartAndEnd(FVector& Start, FVector& End);
 
 	bool CanPickup = true;
+	bool IsReloading = false;
+	bool IsFiring = false;
 
 	AMannequin* PlayerCharacter = nullptr;
 

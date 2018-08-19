@@ -20,6 +20,12 @@ public:
 	UFUNCTION(BlueprintCallable)
 	void PopulateBoundsVolumePool();
 
+	UFUNCTION(BlueprintCallable)
+	void IncrementScore();
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
+	int32 Score;
+
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
 	class UActorPool* NavMeshBoundsVolumePool;
