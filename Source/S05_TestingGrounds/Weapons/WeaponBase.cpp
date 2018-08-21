@@ -170,7 +170,7 @@ void AWeaponBase::OnFire()
 						ActualDamage *= 4.f;
 					}
 					UGameplayStatics::ApplyPointDamage(HitActor, ActualDamage, PlayerCharacter->GetUsedCamera()->GetForwardVector(), HitResult, ActorOwner->GetInstigatorController(), this, DamageType);
-					GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Green, FString::Printf(TEXT("I Hit: %s and the component: %s"), *HitResult.GetActor()->GetName(), *HitResult.GetComponent()->GetName()));
+					//GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Green, FString::Printf(TEXT("I Hit: %s and the component: %s"), *HitResult.GetActor()->GetName(), *HitResult.GetComponent()->GetName()));
 
 					UParticleSystem* SelectedEffect = nullptr;
 					switch (SurfaceType)
@@ -192,7 +192,7 @@ void AWeaponBase::OnFire()
 					TracerEndPoint = HitResult.ImpactPoint;
 					PlayFireEffects(TracerEndPoint);
 
-					GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Green, FString::Printf(TEXT("I Hit: %s"), *HitResult.GetActor()->GetName()));
+					//GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Green, FString::Printf(TEXT("I Hit: %s"), *HitResult.GetActor()->GetName()));
 				}
 			}
 		}
@@ -219,7 +219,7 @@ void AWeaponBase::OnFire()
 				ActualDamage *= 4.f;
 			}
 			UGameplayStatics::ApplyPointDamage(HitActor, ActualDamage, PlayerCharacter->GetUsedCamera()->GetForwardVector(), HitResult, ActorOwner->GetInstigatorController(), this, DamageType);
-			GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Green, FString::Printf(TEXT("I Hit: %s and the component: %s"), *HitResult.GetActor()->GetName(), *HitResult.GetComponent()->GetName() ));
+			//GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Green, FString::Printf(TEXT("I Hit: %s and the component: %s"), *HitResult.GetActor()->GetName(), *HitResult.GetComponent()->GetName() ));
 
 			UParticleSystem* SelectedEffect = nullptr;
 			switch (SurfaceType)

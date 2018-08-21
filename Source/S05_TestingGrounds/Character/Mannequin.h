@@ -81,11 +81,11 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
 	bool IsFirstPerson;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	UPROPERTY(BlueprintReadOnly)
 	bool PrimaryInHand;
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	UPROPERTY(BlueprintReadOnly)
 	bool SecondaryInHand;
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	UPROPERTY(BlueprintReadOnly)
 	bool MeleeInHand;
 	
 	UPROPERTY(VisibleAnywhere)
@@ -98,17 +98,17 @@ protected:
 	UPROPERTY(BlueprintReadOnly)
 	bool bWantsToZoom;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
+	UPROPERTY(BlueprintReadWrite)
 	bool ShouldError;
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
+	UPROPERTY(BlueprintReadWrite)
 	FString ErrorMessage;
 	FTimerHandle ErrorHandle;
 
-	UPROPERTY(EditDefaultsOnly, meta = (EditCondition = "SpawnFromClass"))
+	UPROPERTY(EditDefaultsOnly,BlueprintReadWrite, meta = (EditCondition = "SpawnFromClass"))
 	TSubclassOf<AWeaponBase> GunActor;
-	UPROPERTY(EditDefaultsOnly)
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
 	TSubclassOf<ANadeActor> NadeActor;
-	UPROPERTY(EditDefaultsOnly)
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
 	TSubclassOf<AMeleeActor> MeleeActor;
 
 	UPROPERTY(EditDefaultsOnly)
@@ -200,7 +200,8 @@ private:
 	bool canFire = true;
 	bool isFiring;
 
-	
+	bool HasSetNade = false; //FEELS BAD TO DO THIS
+	TSubclassOf<ANadeActor> SetNade;
 
 	UPROPERTY(VisibleAnywhere)
 	ANadeActor* Nade;

@@ -64,9 +64,10 @@ void AMannequin::BeginPlay()
 	{
 		SpawnAndAttachWeapon(GunActor);
 	}
-	if (NadeActor)
+	SetNade = NadeActor;
+	if (SetNade)
 	{
-		Nade = GetWorld()->SpawnActor<ANadeActor>(NadeActor);
+		Nade = GetWorld()->SpawnActor<ANadeActor>(SetNade);
 		Nade->SetOwner(this);
 		AttachNadeToBack(Nade);
 	}
@@ -182,7 +183,13 @@ void AMannequin::TryPickup()
 				AmountOfNade = 3.f;
 				if (Nade == nullptr)
 				{
-					Nade = GetWorld()->SpawnActor<ANadeActor>(NadeActor);
+					if (!HasSetNade)
+					{
+						SetNade = HitResult.GetActor()->GetClass();
+						HasSetNade = true;
+					}
+
+					Nade = GetWorld()->SpawnActor<ANadeActor>(SetNade);
 					Nade->SetOwner(this);
 					NadeEquip();
 				}
@@ -859,9 +866,9 @@ void AMannequin::SetNadeThrown(UAnimMontage* NadeBasePose)
 	{
 		Nade = nullptr;
 	}
-	else if (NadeActor)
+	else if (SetNade)
 	{
-			Nade = GetWorld()->SpawnActor<ANadeActor>(NadeActor);
+			Nade = GetWorld()->SpawnActor<ANadeActor>(SetNade);
 			Nade->SetOwner(this);
 			NadeEquip();
 	}
