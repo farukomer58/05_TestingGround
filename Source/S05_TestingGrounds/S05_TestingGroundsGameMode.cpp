@@ -1,7 +1,6 @@
 // Copyright 1998-2017 Epic Games, Inc. All Rights Reserved.
 
 #include "S05_TestingGroundsGameMode.h"
-#include "S05_TestingGroundsHUD.h"
 #include "UObject/ConstructorHelpers.h"
 
 AS05_TestingGroundsGameMode::AS05_TestingGroundsGameMode()
